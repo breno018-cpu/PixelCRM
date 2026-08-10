@@ -103,7 +103,7 @@ export default function CRMInterface({ onGoToConnect, qrToken }) {
   const [showQrLinkPopup, setShowQrLinkPopup] = useState(false);
   const [linkCopied, setLinkCopied] = useState(false);
 
-  const qrFullUrl = qrToken ? `${window.location.origin}/c/${qrToken}` : '';
+  const qrFullUrl = qrToken ? `${window.location.origin}/?qr=${qrToken}` : '';
   const handleCopyQrLink = () => {
     if (!qrFullUrl) return;
     navigator.clipboard.writeText(qrFullUrl).then(() => {
