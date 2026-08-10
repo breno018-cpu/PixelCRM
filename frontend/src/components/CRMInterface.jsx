@@ -601,31 +601,30 @@ export default function CRMInterface({ onGoToConnect, qrToken }) {
             </svg>
           </button>
 
-          {/* Botão: Desconectar WhatsApp (só aparece se conectado) */}
-          {whatsappStatus === 'connected' && (
-            <button
-              onClick={() => setShowDisconnectConfirm(true)}
-              className="w-10 h-10 rounded-full flex items-center justify-center text-rose-400 hover:bg-rose-50 hover:text-rose-600 transition-all"
-              title="Desconectar Dispositivo WhatsApp"
-            >
-              <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          {/* Botão: Conexão WhatsApp — sempre visível, muda cor/ação conforme status */}
+          <button
+            onClick={() => whatsappStatus === 'connected' ? setShowDisconnectConfirm(true) : onGoToConnect()}
+            className={`w-10 h-10 rounded-full flex items-center justify-center transition-all border ${
+              whatsappStatus === 'connected'
+                ? 'text-rose-500 border-rose-200 bg-rose-50 hover:bg-rose-500 hover:text-white hover:border-rose-500'
+                : 'text-amber-500 border-amber-200 bg-amber-50 hover:bg-amber-500 hover:text-white hover:border-amber-500'
+            }`}
+            title={whatsappStatus === 'connected' ? 'Desconectar Dispositivo WhatsApp' : 'Conectar WhatsApp'}
+          >
+            {whatsappStatus === 'connected' ? (
+              <svg xmlns="http://www.w3.org/2000/svg" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
                 <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/>
                 <polyline points="16 17 21 12 16 7"/>
                 <line x1="21" y1="12" x2="9" y2="12"/>
               </svg>
-            </button>
-          )}
-
-          {/* Botão: Reconectar (só aparece se desconectado) */}
-          {whatsappStatus !== 'connected' && (
-            <button
-              onClick={onGoToConnect}
-              className="w-10 h-10 rounded-full flex items-center justify-center text-amber-500 hover:bg-[#eae6df] transition-all"
-              title="Reconectar WhatsApp"
-            >
-              <AlertTriangle size={20} className="animate-bounce" />
-            </button>
-          )}
+            ) : (
+              <svg xmlns="http://www.w3.org/2000/svg" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"/>
+                <polyline points="10 17 15 12 10 7"/>
+                <line x1="15" y1="12" x2="3" y2="12"/>
+              </svg>
+            )}
+          </button>
 
           <button
             onClick={() => {
