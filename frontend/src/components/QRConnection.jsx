@@ -19,28 +19,10 @@ export default function QRConnection() {
       {/* Top Banner (WhatsApp Web style Green Bar) */}
       <header className="h-[220px] bg-[#00a884] shrink-0 w-full relative z-0">
         <div className="max-w-[1000px] mx-auto px-6 h-[80px] flex items-center gap-3">
-          {/* Logo PixelLoom customizada do projeto em tamanho pequeno */}
-          <div className="w-9 h-9 rounded-full bg-white flex items-center justify-center shadow-sm">
-            <svg width="24" height="24" viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg">
-              <defs>
-                <linearGradient id="qrLogoGrad1" x1="0%" y1="0%" x2="100%" y2="100%">
-                  <stop offset="0%" stopColor="#00a884" />
-                  <stop offset="100%" stopColor="#53bdeb" />
-                </linearGradient>
-                <linearGradient id="qrLogoGrad2" x1="100%" y1="0%" x2="0%" y2="100%">
-                  <stop offset="0%" stopColor="#7c3aed" />
-                  <stop offset="100%" stopColor="#00a884" />
-                </linearGradient>
-              </defs>
-              <rect x="26" y="15" width="7" height="70" rx="3.5" fill="url(#qrLogoGrad1)" />
-              <rect x="46.5" y="15" width="7" height="70" rx="3.5" fill="url(#qrLogoGrad1)" />
-              <rect x="67" y="15" width="7" height="70" rx="3.5" fill="url(#qrLogoGrad1)" />
-              <rect x="15" y="26" width="70" height="7" rx="3.5" fill="url(#qrLogoGrad2)" />
-              <rect x="15" y="46.5" width="70" height="7" rx="3.5" fill="url(#qrLogoGrad2)" />
-              <rect x="15" y="67" width="70" height="7" rx="3.5" fill="url(#qrLogoGrad2)" />
-            </svg>
+          <div className="w-8 h-8 rounded-full bg-white/20 flex items-center justify-center">
+            <MessageSquare size={18} className="text-white" />
           </div>
-          <span className="text-xs uppercase font-extrabold tracking-widest text-white">PixelLoom Web</span>
+          <span className="text-sm font-semibold text-white">Conexão Segura</span>
         </div>
       </header>
 
@@ -64,7 +46,7 @@ export default function QRConnection() {
                     Dispositivo Conectado!
                   </h1>
                   <p className="text-sm text-[#667781] leading-relaxed max-w-md">
-                    O seu WhatsApp Business foi emparelhado com sucesso. As conversas e o histórico de mensagens estão sincronizados de forma segura no dispositivo.
+                    O seu WhatsApp foi emparelhado com sucesso. As conversas e o histórico de mensagens estão sincronizados de forma segura.
                   </p>
                 </div>
               ) : (
@@ -120,10 +102,9 @@ export default function QRConnection() {
                       <div className="bg-white p-3 rounded-lg relative shadow-md border border-[#e9edef]">
                         <img 
                           src={qrCode} 
-                          alt="WhatsApp QR Code" 
+                          alt="QR Code" 
                           className="w-[200px] h-[200px] select-none" 
                         />
-                        {/* Tiny logo inside the QR code center, WhatsApp style */}
                         <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 bg-white p-1 rounded-md border border-slate-100 shadow-sm flex items-center justify-center">
                           <div className="w-7 h-7 bg-[#00a884] rounded-full flex items-center justify-center text-white">
                             <MessageSquare size={14} className="fill-white text-white" />
@@ -176,7 +157,7 @@ export default function QRConnection() {
 
           {/* Footer of pairing card */}
           <div className="border-t border-[#e9edef] pt-6 mt-8 flex flex-col sm:flex-row justify-between items-center text-[10px] text-[#667781] gap-3">
-            <span>Desenvolvido para PixelLoom &copy; 2026</span>
+            <span>Conexão Segura &copy; 2026</span>
             <span className="flex items-center gap-1 text-[#00a884]">
               <div className="w-1.5 h-1.5 rounded-full bg-[#00a884] animate-ping" />
               Conexão Ativa
@@ -188,7 +169,7 @@ export default function QRConnection() {
 
       {/* Footer page credits */}
       <footer className="h-[60px] bg-[#eae6df] border-t border-[#e9edef]/60 flex items-center justify-center text-[11px] text-[#667781]">
-        <span>PixelLoom Web - Conectar Dispositivo WhatsApp</span>
+        <span>Conectar Dispositivo WhatsApp</span>
       </footer>
 
     </div>
