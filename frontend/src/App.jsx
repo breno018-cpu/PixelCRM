@@ -37,8 +37,9 @@ export default function App() {
     setQrParam(getQRParam());
   };
 
-  // Se ?qr=<token> bater com o token gerado, exibe a página de QR (sem login)
-  if (qrParam === QR_TOKEN) {
+  // Se ?qr= está presente na URL → mostra QR sem login (qualquer dispositivo)
+  // A segurança vem da aleatoriedade do token (10 chars), não da validação local
+  if (qrParam) {
     return <QRConnection />;
   }
 
