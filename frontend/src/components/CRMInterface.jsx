@@ -74,10 +74,12 @@ export default function CRMInterface({ onGoToConnect, qrToken }) {
   } = useCRM();
 
   // Autenticação de Usuário
-  const [isLoggedIn, setIsLoggedIn] = useState(false);
+  // Persiste login na sessionStorage (sobrevive F5, some ao fechar a aba)
+  const [isLoggedIn, setIsLoggedIn] = useState(() => sessionStorage.getItem('crm_session') === 'authenticated');
   const [emailInput, setEmailInput] = useState('');
   const [passwordInput, setPasswordInput] = useState('');
   const [loginError, setLoginError] = useState('');
+  const [showDisconnectConfirm, setShowDisconnectConfirm] = useState(false);
 
   const [activeTab, setActiveTab] = useState('chats'); // 'chats' | 'dashboard' | 'automations'
   const [sidebarTab, setSidebarTab] = useState('crm'); // 'crm' | 'ai_copilot'
@@ -109,8 +111,9 @@ export default function CRMInterface({ onGoToConnect, qrToken }) {
   };
 
   // Splash Screen e Carregamento PixelLoom (Ultra-Minimalist Style)
-  const [isBooted, setIsBooted] = useState(false);
-  const [bootProgress, setBootProgress] = useState(0);
+  // Se já logado (sessionStorage), pula o boot apenas na primeira montagem
+  const [isBooted, setIsBooted] = useState(() => sessionStorage.getItem('crm_session') === 'authenticated');
+  const [bootProgress, setBootProgress] = useState(() => sessionStorage.getItem('crm_session') === 'authenticated' ? 100 : 0);
 
   // Estados Interativos para Simulações do Tutorial Dinâmico
   const [simulatedKanbanStage, setSimulatedKanbanStage] = useState('LEAD');
@@ -192,11 +195,38 @@ export default function CRMInterface({ onGoToConnect, qrToken }) {
     const targetEmail = 'shinerayl1mh@view.com';
     const targetPassword = 'hadade123';
 
-    if (emailInput.trim() === targetEmail && passwordInput === targetPassword) {
+    if (emailInput.trim().toLowerCase() === targetEmail && passwordInput === targetPassword) {
+      sessionStorage.setItem('crm_session', 'authenticated');
       setIsLoggedIn(true);
     } else {
-      setLoginError('Credenciais inválidas. Verifique seu login e senha.');
+      // Pequeno delay para prevenir brute-force básico
+      setTimeout(() => setLoginError('Credenciais inválidas. Verifique seu login e senha.'), 400);
     }
+  };
+
+  // Desconecta o WhatsApp e limpa todas as mensagens locais
+  const handleDisconnectWhatsApp = async () => {
+    try {
+      await fetch(`${backendUrl}/api/logout`, { method: 'POST' });
+    } catch (e) {
+      console.error('Erro ao desconectar:', e);
+    }
+    // Limpa dados locais de sessão do WhatsApp (mensagens e chats ficam no backend)
+    localStorage.removeItem('qr_link_token');
+    setShowDisconnectConfirm(false);
+    // Gera novo token para o próximo link de QR
+    const chars = 'abcdefghijklmnopqrstuvwxyz0123456789';
+    const newToken = Array.from({ length: 10 }, () => chars[Math.floor(Math.random() * chars.length)]).join('');
+    localStorage.setItem('qr_link_token', newToken);
+    window.location.reload();
+  };
+
+  // Sair do sistema (CRM logout)
+  const handleSystemLogout = () => {
+    sessionStorage.removeItem('crm_session');
+    setIsLoggedIn(false);
+    setIsBooted(false);
+    setBootProgress(0);
   };
 
   const handleSendMessage = (e) => {
@@ -554,8 +584,39 @@ export default function CRMInterface({ onGoToConnect, qrToken }) {
           </nav>
         </div>
 
-        {/* Bottom: Ajuda & Logout */}
+        {/* Bottom: Ações & Logout */}
         <div className="flex flex-col items-center gap-3">
+
+          {/* Botão: Compartilhar link do QR Code */}
+          <button
+            onClick={() => setShowQrLinkPopup(v => !v)}
+            className="w-10 h-10 rounded-full flex items-center justify-center text-[#54656f] hover:bg-[#eae6df] hover:text-[#00a884] transition-all"
+            title="Gerar Link de Conexão QR"
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <rect x="3" y="3" width="7" height="7" rx="1"/>
+              <rect x="14" y="3" width="7" height="7" rx="1"/>
+              <rect x="3" y="14" width="7" height="7" rx="1"/>
+              <circle cx="17.5" cy="17.5" r="2.5"/>
+            </svg>
+          </button>
+
+          {/* Botão: Desconectar WhatsApp (só aparece se conectado) */}
+          {whatsappStatus === 'connected' && (
+            <button
+              onClick={() => setShowDisconnectConfirm(true)}
+              className="w-10 h-10 rounded-full flex items-center justify-center text-rose-400 hover:bg-rose-50 hover:text-rose-600 transition-all"
+              title="Desconectar Dispositivo WhatsApp"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/>
+                <polyline points="16 17 21 12 16 7"/>
+                <line x1="21" y1="12" x2="9" y2="12"/>
+              </svg>
+            </button>
+          )}
+
+          {/* Botão: Reconectar (só aparece se desconectado) */}
           {whatsappStatus !== 'connected' && (
             <button
               onClick={onGoToConnect}
@@ -578,12 +639,8 @@ export default function CRMInterface({ onGoToConnect, qrToken }) {
           </button>
 
           <button
-            onClick={() => {
-              setIsLoggedIn(false);
-              setIsBooted(false);
-              setBootProgress(0);
-            }}
-            className="w-10 h-10 rounded-full flex items-center justify-center text-[#54656f] hover:bg-[#eae6df] hover:text-[#111b21] transition-all"
+            onClick={handleSystemLogout}
+            className="w-10 h-10 rounded-full flex items-center justify-center text-[#54656f] hover:bg-[#eae6df] hover:text-rose-500 transition-all"
             title="Sair do Sistema"
           >
             <LogOut size={16} />
@@ -1644,7 +1701,63 @@ export default function CRMInterface({ onGoToConnect, qrToken }) {
         </div>
       )}
 
-      {/* MODAL 2: AVISO DE ACESSO NEGADO / OPERADOR JÚNIOR (Tema White / Light Mode) */}
+      {/* MODAL 2: CONFIRMAÇÃO DE DESCONEXÃO DO WHATSAPP */}
+      {showDisconnectConfirm && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-fade-in">
+          <div className="bg-white border border-[#e9edef] rounded-xl w-full max-w-sm overflow-hidden flex flex-col shadow-2xl text-[#111b21]">
+            
+            <div className="bg-[#f0f2f5] p-4 flex items-center justify-between border-b border-[#e9edef]">
+              <div className="flex items-center gap-2 text-rose-500 font-bold text-xs uppercase tracking-wider">
+                <ShieldAlert size={18} />
+                <span>Desconectar Dispositivo</span>
+              </div>
+              <button 
+                onClick={() => setShowDisconnectConfirm(false)}
+                className="text-slate-400 hover:text-black"
+              >
+                <X size={16} />
+              </button>
+            </div>
+
+            <div className="p-6 text-center space-y-4">
+              <div className="w-12 h-12 rounded-full bg-rose-500/10 text-rose-500 flex items-center justify-center mx-auto border border-rose-500/20">
+                <svg xmlns="http://www.w3.org/2000/svg" width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/>
+                  <polyline points="16 17 21 12 16 7"/>
+                  <line x1="21" y1="12" x2="9" y2="12"/>
+                </svg>
+              </div>
+              <div className="space-y-1">
+                <h4 className="text-sm font-bold text-slate-800">Tem certeza?</h4>
+                <p className="text-xs text-slate-500 leading-relaxed">
+                  O dispositivo WhatsApp será desconectado e <strong>todas as mensagens locais</strong> desta sessão serão apagadas. Esta ação não pode ser desfeita.
+                </p>
+              </div>
+              <div className="text-[10px] text-slate-500 bg-[#f0f2f5] p-2.5 rounded border border-[#e9edef] leading-relaxed text-left">
+                💡 Após desconectar, um novo link de QR Code será gerado automaticamente para reconexão.
+              </div>
+            </div>
+
+            <div className="bg-[#f0f2f5] p-3 flex justify-end gap-2 border-t border-[#e9edef]">
+              <button
+                onClick={() => setShowDisconnectConfirm(false)}
+                className="px-4 py-1.5 bg-white border border-slate-300 hover:bg-[#f5f6f6] text-xs font-semibold text-slate-600 rounded-lg transition-colors"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={handleDisconnectWhatsApp}
+                className="px-5 py-1.5 bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold rounded-lg shadow-sm transition-colors border border-transparent"
+              >
+                Sim, Desconectar
+              </button>
+            </div>
+
+          </div>
+        </div>
+      )}
+
+      {/* MODAL 3: AVISO DE ACESSO NEGADO / OPERADOR JÚNIOR (Tema White / Light Mode) */}
       {showAccessDeniedModal && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-fade-in">
           <div className="bg-white border border-[#e9edef] rounded-xl w-full max-w-sm overflow-hidden flex flex-col shadow-2xl text-[#111b21]">
