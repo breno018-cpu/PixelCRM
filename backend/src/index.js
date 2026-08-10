@@ -149,7 +149,8 @@ app.get('/api/chats/:id/messages', async (req, res) => {
 
     io.emit('chat:updated', updatedChat);
 
-    return res.json(messages);
+    // Retorna mensagens + total para o frontend saber se pode haver mais
+    return res.json({ messages, total: messages.length });
   } catch (error) {
     return res.status(500).json({ error: error.message });
   }
@@ -177,9 +178,8 @@ app.post('/api/chats/:id/messages', async (req, res) => {
  */
 app.post('/api/chats/:id/load-history', async (req, res) => {
   try {
-    const { id } = req.params; // JID do WhatsApp
+    const { id } = req.params;
     
-    // Localiza a mensagem mais antiga registrada no banco local para este chat
     const oldestMessage = await prisma.message.findFirst({
       where: { chatId: id },
       orderBy: { timestamp: 'asc' }
@@ -189,7 +189,7 @@ app.post('/api/chats/:id/load-history', async (req, res) => {
     const socketObj = getWASocket();
     
     if (!socketObj) {
-      return res.status(400).json({ error: 'WhatsApp não está conectado.' });
+      return res.status(400).json({ error: 'WhatsApp n\u00e3o est\u00e1 conectado.' });
     }
 
     if (oldestMessage) {
@@ -211,13 +211,14 @@ app.post('/api/chats/:id/load-history', async (req, res) => {
       });
 
       await socketObj.fetchMessageHistory(count, key, Math.floor(oldestMessage.timestamp.getTime() / 1000));
-      return res.json({ success: true, message: 'Solicitação de histórico anterior enviada.' });
+      return res.json({ success: true, hasMore: true, message: 'Solicita\u00e7\u00e3o de hist\u00f3rico anterior enviada.' });
     } else {
-      console.log(`[API] Não há mensagens locais para o chat ${id}. Baileys não suporta carregar mensagens anteriores sem um cursor válido.`);
-      return res.status(400).json({ error: 'Nenhuma mensagem local encontrada para este chat. Não é possível iniciar a paginação de histórico sem uma mensagem de referência.' });
+      // Sem mensagem de refer\u00eancia = n\u00e3o h\u00e1 mais hist\u00f3rico para carregar
+      console.log(`[API] Chat ${id} n\u00e3o possui mensagens locais — hist\u00f3rico esgotado.`);
+      return res.json({ success: false, hasMore: false, message: 'Sem mais hist\u00f3rico dispon\u00edvel.' });
     }
   } catch (error) {
-    console.error('[API] Erro ao solicitar histórico do WhatsApp:', error);
+    console.error('[API] Erro ao solicitar hist\u00f3rico do WhatsApp:', error);
     return res.status(500).json({ error: error.message });
   }
 });

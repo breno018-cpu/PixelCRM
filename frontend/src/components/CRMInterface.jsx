@@ -65,7 +65,9 @@ export default function CRMInterface({ onGoToConnect, qrToken }) {
     setArchivedView,
     loadingChats,
     loadingMessages,
+    loadingMoreMessages,
     syncProgresses,
+    hasMoreMessages,
     selectChat,
     sendChatMessage,
     updateCRMInfo,
@@ -1022,15 +1024,30 @@ export default function CRMInterface({ onGoToConnect, qrToken }) {
                     </div>
                   ) : (
                     <>
-                      {/* Paginação manual */}
+                      {/* Paginação inteligente: sabe quando acabou o histórico */}
                       <div className="flex justify-center my-3">
-                        <button
-                          onClick={() => loadMoreMessages(activeChat.id)}
-                          className="px-4 py-2 rounded-xl bg-white border border-[#e9edef] text-[11px] font-bold text-[#00a884] hover:bg-[#f5f6f6] active:scale-95 transition-all flex items-center gap-1.5 shadow-sm"
-                        >
-                          <Clock size={12} />
-                          Carregar histórico anterior do WhatsApp
-                        </button>
+                        {loadingMoreMessages ? (
+                          // Carregando mais mensagens do WhatsApp
+                          <div className="flex items-center gap-2 px-4 py-2 rounded-xl bg-white border border-[#e9edef] text-[11px] text-[#667781] shadow-sm">
+                            <Loader2 size={12} className="animate-spin text-[#00a884]" />
+                            Buscando histórico anterior...
+                          </div>
+                        ) : hasMoreMessages ? (
+                          // Ainda pode ter mensagens mais antigas
+                          <button
+                            onClick={() => loadMoreMessages(activeChat.id)}
+                            className="px-4 py-2 rounded-xl bg-white border border-[#e9edef] text-[11px] font-bold text-[#00a884] hover:bg-[#f5f6f6] active:scale-95 transition-all flex items-center gap-1.5 shadow-sm"
+                          >
+                            <Clock size={12} />
+                            Carregar histórico anterior
+                          </button>
+                        ) : (
+                          // Início da conversa atingido
+                          <div className="flex items-center gap-1.5 px-4 py-1.5 rounded-full bg-[#f0f2f5] border border-[#e9edef] text-[10px] text-[#667781]">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+                            Início da conversa
+                          </div>
+                        )}
                       </div>
 
                       {messages.map((msg) => {

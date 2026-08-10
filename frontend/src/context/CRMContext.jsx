@@ -16,7 +16,11 @@ export const CRMProvider = ({ children }) => {
   
   const [loadingChats, setLoadingChats] = useState(false);
   const [loadingMessages, setLoadingMessages] = useState(false);
+  const [loadingMoreMessages, setLoadingMoreMessages] = useState(false);
   const [syncProgresses, setSyncProgresses] = useState({});
+  // Rastreia por chatId se ainda pode haver mensagens mais antigas no WhatsApp
+  // true = pode ter mais | false = chegou ao início da conversa
+  const [hasMoreMap, setHasMoreMap] = useState({});
 
   // Busca a lista de chats da API
   const fetchChats = useCallback(async () => {
@@ -51,9 +55,14 @@ export const CRMProvider = ({ children }) => {
       const response = await fetch(`${backendUrl}/api/chats/${chatId}/messages`);
       if (response.ok) {
         const data = await response.json();
-        setMessages(data);
+        // Suporta tanto o formato antigo (array) quanto o novo ({messages, total})
+        const msgs = Array.isArray(data) ? data : (data.messages || []);
+        const total = Array.isArray(data) ? data.length : (data.total || 0);
+        setMessages(msgs);
+        // Se há mensagens, assume que pode ter mais no WhatsApp (otimista)
+        // Muda para false apenas quando load-history confirmar que acabou
+        setHasMoreMap(prev => ({ ...prev, [chatId]: total > 0 }));
         
-        // Zera o contador de não lidas localmente para este chat
         setChats(prevChats => 
           prevChats.map(c => c.id === chatId ? { ...c, unreadCount: 0 } : c)
         );
@@ -139,7 +148,6 @@ export const CRMProvider = ({ children }) => {
     const handleHistorySynced = () => {
       console.log('[CRM] Histórico sincronizado pelo backend, recarregando chats...');
       fetchChats();
-      // Recarrega as mensagens do chat aberto para exibir as novas mensagens sincronizadas
       setActiveChat(prev => {
         if (prev) {
           fetchMessages(prev.id);
@@ -264,15 +272,22 @@ export const CRMProvider = ({ children }) => {
 
   // Solicita carregamento de histórico adicional no WhatsApp
   const loadMoreMessages = async (chatId) => {
+    setLoadingMoreMessages(true);
     try {
       const response = await fetch(`${backendUrl}/api/chats/${chatId}/load-history`, {
         method: 'POST'
       });
-      if (!response.ok) {
-        throw new Error('Falha ao carregar mais histórico');
+      const data = await response.json();
+      // O backend agora retorna { hasMore } indicando se há mais histórico
+      if (data.hasMore === false) {
+        // Chegou ao início da conversa — não há mais mensagens para carregar
+        setHasMoreMap(prev => ({ ...prev, [chatId]: false }));
       }
+      // Se hasMore === true, o histórico chegará via socket (history:synced)
     } catch (e) {
       console.error('[CRM] Erro ao carregar histórico anterior:', e);
+    } finally {
+      setLoadingMoreMessages(false);
     }
   };
 
@@ -291,7 +306,10 @@ export const CRMProvider = ({ children }) => {
       setArchivedView,
       loadingChats,
       loadingMessages,
+      loadingMoreMessages,
       syncProgresses,
+      // true = pode ter mais mensagens no WhatsApp | false = início da conversa atingido
+      hasMoreMessages: activeChat ? (hasMoreMap[activeChat.id] ?? true) : false,
       selectChat,
       sendChatMessage,
       updateCRMInfo,
