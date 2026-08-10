@@ -49,7 +49,7 @@ const PixelLoomLogo = ({ size = 32, className = "" }) => (
   </svg>
 );
 
-export default function CRMInterface({ onGoToConnect }) {
+export default function CRMInterface({ onGoToConnect, qrToken }) {
   const { whatsappStatus, isConnected, backendUrl } = useSocket();
   const {
     chats,
@@ -96,6 +96,17 @@ export default function CRMInterface({ onGoToConnect }) {
   const [tutorialStep, setTutorialStep] = useState(0); // 0 = Conexão, 1 = Funil, 2 = Copiloto IA, 3 = Progresso Sync, 4 = Multi-Lojas
   const [showAccessDeniedModal, setShowAccessDeniedModal] = useState(false);
   const [selectedImagePreview, setSelectedImagePreview] = useState(null); // Lightbox URL
+  const [showQrLinkPopup, setShowQrLinkPopup] = useState(false);
+  const [linkCopied, setLinkCopied] = useState(false);
+
+  const qrFullUrl = qrToken ? `${window.location.origin}/c/${qrToken}` : '';
+  const handleCopyQrLink = () => {
+    if (!qrFullUrl) return;
+    navigator.clipboard.writeText(qrFullUrl).then(() => {
+      setLinkCopied(true);
+      setTimeout(() => setLinkCopied(false), 2000);
+    });
+  };
 
   // Splash Screen e Carregamento PixelLoom (Ultra-Minimalist Style)
   const [isBooted, setIsBooted] = useState(false);
@@ -428,15 +439,51 @@ export default function CRMInterface({ onGoToConnect }) {
         
         {/* Top: Status & Logo/Avatar */}
         <div className="flex flex-col items-center gap-6">
-          <div className="relative group cursor-pointer" onClick={onGoToConnect} title="Ver QR Code de Conexão (Link Externo)">
-            <div className="w-10 h-10 rounded-full bg-white border border-[#e9edef] flex items-center justify-center font-bold text-slate-400 shadow-sm overflow-hidden">
-              <PixelLoomLogo size={32} />
+          <div className="relative" ref={null}>
+            <div
+              className="relative group cursor-pointer"
+              onClick={() => setShowQrLinkPopup(v => !v)}
+              title="Link de Conexão QR"
+            >
+              <div className="w-10 h-10 rounded-full bg-white border border-[#e9edef] flex items-center justify-center font-bold text-slate-400 shadow-sm overflow-hidden">
+                <PixelLoomLogo size={32} />
+              </div>
+              {/* Indicador de Status */}
+              <span className={`absolute bottom-0 right-0 w-3.5 h-3.5 rounded-full border-2 border-[#f0f2f5] ${
+                whatsappStatus === 'connected' ? 'bg-[#00a884]' : 
+                whatsappStatus === 'qr' ? 'bg-amber-500 animate-pulse' : 'bg-rose-500'
+              }`} />
             </div>
-            {/* Indicador de Status */}
-            <span className={`absolute bottom-0 right-0 w-3.5 h-3.5 rounded-full border-2 border-[#f0f2f5] ${
-              whatsappStatus === 'connected' ? 'bg-[#00a884]' : 
-              whatsappStatus === 'qr' ? 'bg-amber-500 animate-pulse' : 'bg-rose-500'
-            }`} />
+
+            {/* Popup: Link copiável do QR */}
+            {showQrLinkPopup && (
+              <div className="absolute left-[68px] top-0 z-50 w-[300px] bg-white rounded-xl shadow-2xl border border-[#e9edef] p-4 flex flex-col gap-3 animate-fade-in">
+                <div className="flex items-center justify-between">
+                  <span className="text-[11px] font-bold text-[#111b21] uppercase tracking-widest">Link de Conexão</span>
+                  <button onClick={() => setShowQrLinkPopup(false)} className="text-[#54656f] hover:text-[#111b21] text-lg leading-none">×</button>
+                </div>
+                <p className="text-[11px] text-[#667781] leading-relaxed">
+                  Envie este link para qualquer dispositivo. Quem abrir consegue escanear o QR Code sem precisar de login.
+                </p>
+                <div className="flex items-center gap-2 bg-[#f0f2f5] rounded-lg px-3 py-2 border border-[#e9edef]">
+                  <span className="text-[11px] text-[#3b4a54] truncate flex-1 font-mono select-all">{qrFullUrl}</span>
+                  <button
+                    onClick={handleCopyQrLink}
+                    className={`shrink-0 text-[10px] font-bold px-2 py-1 rounded transition-all ${
+                      linkCopied ? 'bg-[#00a884] text-white' : 'bg-white border border-[#e9edef] text-[#54656f] hover:bg-[#eae6df]'
+                    }`}
+                  >
+                    {linkCopied ? '✓ Copiado' : 'Copiar'}
+                  </button>
+                </div>
+                <button
+                  onClick={() => { setShowQrLinkPopup(false); onGoToConnect(); }}
+                  className="w-full py-2 rounded-lg bg-[#00a884] text-white text-[11px] font-bold hover:bg-[#008f72] transition-all"
+                >
+                  Abrir QR Code aqui →
+                </button>
+              </div>
+            )}
           </div>
 
           {/* Botões de navegação */}
