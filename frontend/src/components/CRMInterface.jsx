@@ -207,17 +207,13 @@ export default function CRMInterface({ onGoToConnect, qrToken }) {
   // Desconecta o WhatsApp e limpa todas as mensagens locais
   const handleDisconnectWhatsApp = async () => {
     try {
-      await fetch(`${backendUrl}/api/logout`, { method: 'POST' });
+      // Chama o endpoint que desconecta o WhatsApp E apaga todos os dados do banco
+      await fetch(`${backendUrl}/api/disconnect`, { method: 'POST' });
     } catch (e) {
       console.error('Erro ao desconectar:', e);
     }
-    // Limpa dados locais de sessão do WhatsApp (mensagens e chats ficam no backend)
-    localStorage.removeItem('qr_link_token');
     setShowDisconnectConfirm(false);
-    // Gera novo token para o próximo link de QR
-    const chars = 'abcdefghijklmnopqrstuvwxyz0123456789';
-    const newToken = Array.from({ length: 10 }, () => chars[Math.floor(Math.random() * chars.length)]).join('');
-    localStorage.setItem('qr_link_token', newToken);
+    // Recarrega a página para limpar todo o estado local da interface
     window.location.reload();
   };
 

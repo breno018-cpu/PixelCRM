@@ -53,6 +53,28 @@ app.post('/api/logout', async (req, res) => {
   }
 });
 
+// Desconecta o WhatsApp E apaga TODOS os chats e mensagens do banco
+app.post('/api/disconnect', async (req, res) => {
+  try {
+    // 1. Desconecta o WhatsApp (Baileys)
+    await logoutWhatsApp();
+
+    // 2. Apaga todas as mensagens e chats do banco de dados
+    await prisma.message.deleteMany({});
+    await prisma.chat.deleteMany({});
+
+    // 3. Notifica todos os clientes frontend via socket para limpar a tela
+    io.emit('whatsapp:disconnected');
+    io.emit('chats:cleared');
+
+    return res.json({ success: true, message: 'Dispositivo desconectado e dados apagados.' });
+  } catch (error) {
+    console.error('[API] Erro ao desconectar e limpar dados:', error);
+    return res.status(500).json({ error: error.message });
+  }
+});
+
+
 app.get('/api/chats', async (req, res) => {
   try {
     const { search, funnelStage, tag, archived } = req.query;
