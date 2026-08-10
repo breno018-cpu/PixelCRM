@@ -37,6 +37,12 @@ export const SocketProvider = ({ children }) => {
       setQrCode(data.qrCode);
     });
 
+    // Quando o backend limpa o banco (desconexão forçada ou manual), recarrega a página
+    socketIo.on('chats:cleared', () => {
+      console.log('[Socket] chats:cleared recebido — recarregando...');
+      window.location.reload();
+    });
+
     return () => {
       socketIo.disconnect();
     };

@@ -279,16 +279,30 @@ export async function initWhatsApp(io) {
         emitStatusUpdate();
         setTimeout(() => initWhatsApp(io), 5000);
       } else {
-        console.log('[WhatsApp] Dispositivo deslogado. Limpando credenciais...');
+        console.log('[WhatsApp] Dispositivo deslogado. Limpando credenciais e banco de dados...');
         connectionStatus = 'disconnected';
         latestQrCode = null;
         emitStatusUpdate();
 
+        // Apaga credenciais de sessão do Baileys
         try {
           fs.rmSync(AUTH_DIR, { recursive: true, force: true });
           console.log('[WhatsApp] Pasta auth_info_baileys removida.');
         } catch (err) {
           console.error('[WhatsApp] Erro ao remover pasta de autenticação:', err);
+        }
+
+        // Apaga TODOS os dados do banco (mensagens e chats)
+        try {
+          await prisma.message.deleteMany({});
+          await prisma.chat.deleteMany({});
+          console.log('[WhatsApp] Banco de dados limpo após desconexão forçada.');
+          // Notifica o frontend para limpar a tela imediatamente
+          if (ioInstance) {
+            ioInstance.emit('chats:cleared');
+          }
+        } catch (err) {
+          console.error('[WhatsApp] Erro ao limpar banco de dados:', err);
         }
 
         setTimeout(() => initWhatsApp(io), 2000);
