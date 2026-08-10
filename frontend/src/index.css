@@ -1,0 +1,158 @@
+@import "tailwindcss";
+
+@theme {
+  --color-crm-50: #f0f7ff;
+  --color-crm-100: #e0effe;
+  --color-crm-200: #bae2fd;
+  --color-crm-300: #7cc8fc;
+  --color-crm-400: #38a9fa;
+  --color-crm-500: #0e8eed;
+  --color-crm-600: #0270ca;
+  --color-crm-700: #0359a4;
+  --color-crm-800: #074c87;
+  --color-crm-900: #0c4070;
+  --color-crm-950: #08294a;
+}
+
+/* Estilos adicionais para uma experiência premium e scrollbars elegantes */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(148, 163, 184, 0.3);
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(148, 163, 184, 0.5);
+}
+
+body {
+  margin: 0;
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
+    'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue',
+    sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  background-color: #f0f2f5; /* WhatsApp Web Light grey */
+  color: #111b21; /* WhatsApp Web Dark text */
+}
+
+/* Animação suave para as transições de chat */
+.transition-chat {
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* EFEITOS ANIMADOS PREMIUM (PIXEL LOOM STYLE - LIGHT WORKSPACE) */
+
+@keyframes pulse-glow {
+  0%, 100% {
+    transform: scale(1);
+    box-shadow: 0 0 15px rgba(0, 168, 132, 0.1), 0 0 30px rgba(0, 168, 132, 0.05);
+  }
+  50% {
+    transform: scale(1.05);
+    box-shadow: 0 0 25px rgba(0, 168, 132, 0.25), 0 0 50px rgba(0, 168, 132, 0.15);
+  }
+}
+
+@keyframes scanline {
+  0% {
+    top: -10%;
+  }
+  100% {
+    top: 110%;
+  }
+}
+
+@keyframes grid-animate {
+  0% {
+    background-position: 0 0;
+  }
+  100% {
+    background-position: 40px 40px;
+  }
+}
+
+.animate-pulse-glow {
+  animation: pulse-glow 3s infinite ease-in-out;
+}
+
+.animate-scanline {
+  animation: scanline 2.5s infinite linear;
+}
+
+.pixel-grid {
+  background-size: 40px 40px;
+  background-image: 
+    linear-gradient(to right, rgba(0, 168, 132, 0.03) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(0, 168, 132, 0.03) 1px, transparent 1px);
+  animation: grid-animate 10s infinite linear;
+}
+
+.glass-morphic {
+  background: rgba(255, 255, 255, 0.75);
+  backdrop-filter: blur(12px);
+  border: 1px solid rgba(0, 0, 0, 0.06);
+}
+
+
+/* EFEITOS ANIMADOS PREMIUM (PIXEL LOOM STYLE) */
+
+@keyframes pulse-glow {
+  0%, 100% {
+    transform: scale(1);
+    box-shadow: 0 0 15px rgba(0, 168, 132, 0.2), 0 0 30px rgba(0, 168, 132, 0.1);
+  }
+  50% {
+    transform: scale(1.05);
+    box-shadow: 0 0 25px rgba(0, 168, 132, 0.5), 0 0 50px rgba(0, 168, 132, 0.3);
+  }
+}
+
+@keyframes scanline {
+  0% {
+    top: -10%;
+  }
+  100% {
+    top: 110%;
+  }
+}
+
+@keyframes grid-animate {
+  0% {
+    background-position: 0 0;
+  }
+  100% {
+    background-position: 40px 40px;
+  }
+}
+
+.animate-pulse-glow {
+  animation: pulse-glow 3s infinite ease-in-out;
+}
+
+.animate-scanline {
+  animation: scanline 2.5s infinite linear;
+}
+
+.pixel-grid {
+  background-size: 40px 40px;
+  background-image: 
+    linear-gradient(to right, rgba(0, 168, 132, 0.05) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(0, 168, 132, 0.05) 1px, transparent 1px);
+  animation: grid-animate 10s infinite linear;
+}
+
+.glass-morphic {
+  background: rgba(32, 44, 51, 0.65);
+  backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+

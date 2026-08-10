@@ -1,0 +1,39 @@
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+model Chat {
+  id              String    @id // JID do WhatsApp (ex: 5511999999999@s.whatsapp.net)
+  name            String?   // Nome salvo ou editado
+  pushName        String?   // Nome do perfil do WhatsApp do cliente
+  phone           String    // Telefone formatado
+  unreadCount     Int       @default(0)
+  lastMessageText String?
+  lastMessageTime DateTime?
+  funnelStage     String    @default("LEAD") // LEAD, NEGOTIATION, PROPOSAL, CLOSED
+  tags            String    @default("")     // Tags separadas por vírgula (Ex: "VIP,Aguardando Pgto")
+  notes           String    @default("")     // Notas de CRM internas
+  avatarUrl       String?   // URL do avatar do contato no WhatsApp
+  isArchived      Boolean   @default(false)  // Se a conversa está arquivada no WhatsApp
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+  messages        Message[]
+}
+
+model Message {
+  id          String   @id // ID gerado pelo WhatsApp
+  chatId      String
+  chat        Chat     @relation(fields: [chatId], references: [id], onDelete: Cascade)
+  fromMe      Boolean
+  senderName  String?
+  text        String
+  type        String   @default("text") // text, audio, image, video, document
+  mediaUrl    String?
+  timestamp   DateTime
+  status      String   @default("PENDING") // PENDING, SENT, DELIVERED, READ
+}

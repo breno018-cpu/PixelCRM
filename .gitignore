@@ -1,0 +1,20 @@
+# Node dependencies
+node_modules/
+
+# Local databases, secrets and session info
+backend/.env
+backend/auth_info_baileys/
+backend/prisma/*.db
+backend/prisma/*.db-journal
+backend/public/media/*
+
+# Compiled/Build files
+dist/
+build/
+.DS_Store
+
+# Logs and system generated caches
+*.log
+.gemini/
+.system_generated/
+.eslintcache
