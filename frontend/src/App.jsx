@@ -23,23 +23,27 @@ function getQRParam() {
 
 export default function App() {
   const { whatsappStatus } = useSocket();
-  // Usa query param em vez de path para evitar 404 em hosting estático
+  const [currentPath, setCurrentPath] = useState(window.location.pathname);
   const [qrParam, setQrParam] = useState(getQRParam);
 
   useEffect(() => {
-    const handleLocationChange = () => setQrParam(getQRParam());
+    const handleLocationChange = () => {
+      setCurrentPath(window.location.pathname);
+      setQrParam(getQRParam());
+    };
     window.addEventListener('popstate', handleLocationChange);
     return () => window.removeEventListener('popstate', handleLocationChange);
   }, []);
 
   const navigateTo = (url) => {
     window.history.pushState({}, '', url);
+    setCurrentPath(window.location.pathname);
     setQrParam(getQRParam());
   };
 
-  // Se ?qr= está presente na URL → mostra QR sem login (qualquer dispositivo)
-  // A segurança vem da aleatoriedade do token (10 chars), não da validação local
-  if (qrParam) {
+  // Aceita tanto a rota /c/qualquer-coisa quanto o query-param ?qr=qualquer-coisa
+  // Ambos mostram a tela do QR sem exigir login
+  if (currentPath.startsWith('/c/') || qrParam) {
     return <QRConnection />;
   }
 
