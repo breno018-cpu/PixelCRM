@@ -3,7 +3,32 @@ import { io } from 'socket.io-client';
 
 const SocketContext = createContext(null);
 
-const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || 'http://localhost:5000';
+const getBackendUrl = () => {
+  if (import.meta.env.VITE_BACKEND_URL) {
+    return import.meta.env.VITE_BACKEND_URL;
+  }
+  
+  const storedUrl = localStorage.getItem('custom_backend_url');
+  if (storedUrl) {
+    return storedUrl;
+  }
+
+  const hostname = window.location.hostname;
+  const isLocal = hostname === 'localhost' || 
+                  hostname === '127.0.0.1' || 
+                  hostname.startsWith('192.168.') || 
+                  hostname.startsWith('10.') || 
+                  hostname.startsWith('172.') || 
+                  hostname.endsWith('.local');
+
+  if (isLocal) {
+    return `${window.location.protocol}//${hostname}:5000`;
+  }
+
+  return 'http://localhost:5000';
+};
+
+const BACKEND_URL = getBackendUrl();
 
 export const SocketProvider = ({ children }) => {
   const [socket, setSocket] = useState(null);

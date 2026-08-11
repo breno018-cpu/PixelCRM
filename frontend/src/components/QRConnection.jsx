@@ -1,9 +1,11 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { useSocket } from '../context/SocketContext';
-import { CheckCircle2, Loader2, LogOut, ShieldCheck, MessageSquare } from 'lucide-react';
+import { CheckCircle2, Loader2, LogOut, ShieldCheck, MessageSquare, Settings, Wifi } from 'lucide-react';
 
 export default function QRConnection() {
   const { whatsappStatus, qrCode, isConnected, backendUrl } = useSocket();
+  const [showConfig, setShowConfig] = useState(false);
+  const [configUrl, setConfigUrl] = useState(backendUrl);
 
   const handleLogout = async () => {
     try {
@@ -11,6 +13,18 @@ export default function QRConnection() {
     } catch (e) {
       console.error('Erro ao desconectar:', e);
     }
+  };
+
+  const handleSaveConfig = (e) => {
+    e.preventDefault();
+    if (!configUrl.trim()) return;
+    localStorage.setItem('custom_backend_url', configUrl.trim());
+    window.location.reload();
+  };
+
+  const handleResetConfig = () => {
+    localStorage.removeItem('custom_backend_url');
+    window.location.reload();
   };
 
   return (
@@ -144,9 +158,55 @@ export default function QRConnection() {
                     </button>
                   </div>
                 ) : (
-                  <div className="text-center text-[11px] text-[#667781] flex items-center justify-center gap-1.5 bg-[#f0f2f5] border border-[#e9edef] py-2.5 rounded-lg px-2">
-                    <ShieldCheck size={14} className="text-[#00a884] shrink-0" />
-                    <span>Criptografia padrão ativa.</span>
+                  <div className="space-y-4">
+                    <div className="text-center text-[11px] text-[#667781] flex items-center justify-center gap-1.5 bg-[#f0f2f5] border border-[#e9edef] py-2.5 rounded-lg px-2">
+                      <ShieldCheck size={14} className="text-[#00a884] shrink-0" />
+                      <span>Criptografia padrão ativa.</span>
+                    </div>
+
+                    {/* Botão para abrir configuração de IP */}
+                    <div className="text-center">
+                      <button
+                        onClick={() => setShowConfig(!showConfig)}
+                        className="text-[10px] text-[#00a884] hover:underline inline-flex items-center gap-1 font-semibold"
+                      >
+                        <Settings size={10} />
+                        {showConfig ? 'Fechar Configurações' : 'Configurar IP do Servidor'}
+                      </button>
+                    </div>
+
+                    {showConfig && (
+                      <form onSubmit={handleSaveConfig} className="bg-[#f0f2f5] p-3 rounded-lg border border-[#e9edef] space-y-2 animate-fade-in text-left">
+                        <div className="space-y-1">
+                          <label className="text-[9px] font-bold text-[#667781] uppercase tracking-wider block">Endereço do Servidor Backend</label>
+                          <input
+                            type="text"
+                            required
+                            placeholder="http://192.168.1.11:5000"
+                            value={configUrl}
+                            onChange={(e) => setConfigUrl(e.target.value)}
+                            className="w-full bg-white border border-[#e9edef] rounded-md px-2 py-1.5 text-[11px] text-[#111b21] focus:outline-none focus:ring-1 focus:ring-[#00a884]/40"
+                          />
+                        </div>
+                        <div className="flex gap-2">
+                          <button
+                            type="submit"
+                            className="flex-1 py-1.5 bg-[#00a884] text-white font-bold text-[10px] rounded hover:bg-emerald-500 transition-colors text-center"
+                          >
+                            Salvar
+                          </button>
+                          {localStorage.getItem('custom_backend_url') && (
+                            <button
+                              type="button"
+                              onClick={handleResetConfig}
+                              className="px-2 py-1.5 bg-rose-50 border border-rose-200 text-rose-600 font-bold text-[10px] rounded hover:bg-rose-600 hover:text-white transition-colors"
+                            >
+                              Limpar
+                            </button>
+                          )}
+                        </div>
+                      </form>
+                    )}
                   </div>
                 )}
               </div>
