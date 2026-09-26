@@ -1041,6 +1041,56 @@ app.post('/api/ai/suggest', authenticateToken, async (req, res) => {
   }
 });
 
+// --- HEALTHCHECK & MONITORAMENTO DE PRODUÇÃO (Fase 10) ---
+
+app.get('/api/health', async (req, res) => {
+  let dbStatus = 'healthy';
+  let dbError = null;
+
+  try {
+    await prisma.$queryRaw`SELECT 1`;
+  } catch (err) {
+    dbStatus = 'unhealthy';
+    dbError = err.message;
+  }
+
+  const memory = process.memoryUsage();
+  const uptimeSeconds = Math.floor(process.uptime());
+  const waStatus = getConnectionStatus();
+
+  const isHealthy = dbStatus === 'healthy';
+
+  return res.status(isHealthy ? 200 : 503).json({
+    status: isHealthy ? 'healthy' : 'degraded',
+    version: '1.0.0',
+    service: 'PixelCRM-Shineray-Backend',
+    timestamp: new Date().toISOString(),
+    uptime: {
+      seconds: uptimeSeconds,
+      formatted: `${Math.floor(uptimeSeconds / 3600)}h ${Math.floor((uptimeSeconds % 3600) / 60)}m ${uptimeSeconds % 60}s`
+    },
+    database: {
+      status: dbStatus,
+      dialect: 'sqlite',
+      error: dbError
+    },
+    whatsapp: {
+      connection: waStatus.status,
+      authenticated: waStatus.status === 'connected',
+      phone: waStatus.user?.id || null
+    },
+    system: {
+      nodeVersion: process.version,
+      platform: process.platform,
+      memory: {
+        rssMb: Math.round(memory.rss / (1024 * 1024)),
+        heapTotalMb: Math.round(memory.heapTotal / (1024 * 1024)),
+        heapUsedMb: Math.round(memory.heapUsed / (1024 * 1024))
+      }
+    }
+  });
+});
+
 // --- CONEXÃO WEBSOCKET ---
 
 io.on('connection', (socket) => {
@@ -1066,3 +1116,35 @@ server.listen(PORT, async () => {
     console.error('[WhatsApp] Falha crítica ao iniciar Baileys:', err);
   }
 });
+
+// --- ENCERRAMENTO SEGURO (GRACEFUL SHUTDOWN - Fase 10) ---
+
+let isShuttingDown = false;
+
+async function gracefulShutdown(signal) {
+  if (isShuttingDown) return;
+  isShuttingDown = true;
+  console.log(`[Shutdown] Sinal ${signal} recebido. Iniciando encerramento gracioso...`);
+
+  server.close(async () => {
+    console.log('[Shutdown] Servidor HTTP encerrado.');
+
+    try {
+      await prisma.$disconnect();
+      console.log('[Shutdown] Conexão com banco de dados Prisma fechada.');
+    } catch (err) {
+      console.error('[Shutdown] Erro ao desconectar Prisma:', err);
+    }
+
+    console.log('[Shutdown] Encerramento concluído com sucesso.');
+    process.exit(0);
+  });
+
+  setTimeout(() => {
+    console.warn('[Shutdown] Forçando encerramento após timeout de 10s.');
+    process.exit(1);
+  }, 10000);
+}
+
+process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
+process.on('SIGINT', () => gracefulShutdown('SIGINT'));
