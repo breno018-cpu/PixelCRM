@@ -137,10 +137,16 @@ export default function CRMPanel({
       </header>
 
       {/* 2. NAVEGAÇÃO INTERNA POR ABAS */}
-      <nav className="flex items-center border-b border-[var(--border-subtle,#e9edef)] bg-[var(--bg-panel,#ffffff)] px-2 shrink-0">
+      <nav 
+        role="tablist" 
+        aria-label="Abas do perfil do lead"
+        className="flex items-center border-b border-[var(--border-subtle,#e9edef)] bg-[var(--bg-panel,#ffffff)] px-2 shrink-0"
+      >
         <button
+          role="tab"
+          aria-selected={activeTab === 'overview'}
           onClick={() => setActiveTab('overview')}
-          className={`flex-1 py-2.5 text-center text-xs font-semibold border-b-2 transition-all ${
+          className={`flex-1 py-2.5 text-center text-xs font-semibold border-b-2 transition-all focus-visible:ring-1 focus-visible:ring-[var(--brand-primary,#00a884)] ${
             activeTab === 'overview'
               ? 'border-[var(--brand-primary,#00a884)] text-[var(--brand-primary,#00a884)]'
               : 'border-transparent text-[var(--text-secondary,#667781)] hover:text-[var(--text-primary,#111b21)]'
@@ -149,8 +155,10 @@ export default function CRMPanel({
           Geral
         </button>
         <button
+          role="tab"
+          aria-selected={activeTab === 'funnel'}
           onClick={() => setActiveTab('funnel')}
-          className={`flex-1 py-2.5 text-center text-xs font-semibold border-b-2 transition-all flex items-center justify-center gap-1 ${
+          className={`flex-1 py-2.5 text-center text-xs font-semibold border-b-2 transition-all flex items-center justify-center gap-1 focus-visible:ring-1 focus-visible:ring-[var(--brand-primary,#00a884)] ${
             activeTab === 'funnel'
               ? 'border-[var(--brand-primary,#00a884)] text-[var(--brand-primary,#00a884)]'
               : 'border-transparent text-[var(--text-secondary,#667781)] hover:text-[var(--text-primary,#111b21)]'
@@ -163,8 +171,10 @@ export default function CRMPanel({
           />
         </button>
         <button
+          role="tab"
+          aria-selected={activeTab === 'notes'}
           onClick={() => setActiveTab('notes')}
-          className={`flex-1 py-2.5 text-center text-xs font-semibold border-b-2 transition-all flex items-center justify-center gap-1 ${
+          className={`flex-1 py-2.5 text-center text-xs font-semibold border-b-2 transition-all flex items-center justify-center gap-1 focus-visible:ring-1 focus-visible:ring-[var(--brand-primary,#00a884)] ${
             activeTab === 'notes'
               ? 'border-[var(--brand-primary,#00a884)] text-[var(--brand-primary,#00a884)]'
               : 'border-transparent text-[var(--text-secondary,#667781)] hover:text-[var(--text-primary,#111b21)]'
@@ -176,8 +186,10 @@ export default function CRMPanel({
           )}
         </button>
         <button
+          role="tab"
+          aria-selected={activeTab === 'tags'}
           onClick={() => setActiveTab('tags')}
-          className={`flex-1 py-2.5 text-center text-xs font-semibold border-b-2 transition-all flex items-center justify-center gap-1 ${
+          className={`flex-1 py-2.5 text-center text-xs font-semibold border-b-2 transition-all flex items-center justify-center gap-1 focus-visible:ring-1 focus-visible:ring-[var(--brand-primary,#00a884)] ${
             activeTab === 'tags'
               ? 'border-[var(--brand-primary,#00a884)] text-[var(--brand-primary,#00a884)]'
               : 'border-transparent text-[var(--text-secondary,#667781)] hover:text-[var(--text-primary,#111b21)]'

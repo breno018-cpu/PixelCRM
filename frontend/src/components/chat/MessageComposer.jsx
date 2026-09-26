@@ -171,6 +171,9 @@ export default function MessageComposer({
           disabled={disabled}
           className="p-2 rounded-full text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--active-bg)] transition-colors shrink-0 disabled:opacity-40"
           title="Emojis"
+          aria-label="Abrir catálogo de emojis"
+          aria-expanded={showEmojiPicker}
+          aria-haspopup="dialog"
         >
           <Smile size={22} />
         </button>
@@ -186,6 +189,9 @@ export default function MessageComposer({
               : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--active-bg)]'
           }`}
           title="Anexar arquivo"
+          aria-label="Anexar arquivo ou mídia"
+          aria-expanded={showAttachMenu}
+          aria-haspopup="menu"
         >
           <Paperclip size={22} className={showAttachMenu ? "rotate-45" : ""} />
         </button>
@@ -199,6 +205,7 @@ export default function MessageComposer({
             onChange={(e) => onChange(e.target.value)}
             onKeyDown={handleKeyDown}
             disabled={disabled || isSending}
+            aria-label="Digite uma mensagem"
             placeholder={
               disabled
                 ? "Conecte o WhatsApp para enviar mensagens"
@@ -214,6 +221,7 @@ export default function MessageComposer({
         <button
           type="submit"
           disabled={!value.trim() || disabled || isSending}
+          aria-label={value.trim() ? "Enviar mensagem" : "Digitar mensagem"}
           className={`
             w-10 h-10 rounded-full flex items-center justify-center shrink-0 transition-all shadow-sm
             ${value.trim() && !disabled

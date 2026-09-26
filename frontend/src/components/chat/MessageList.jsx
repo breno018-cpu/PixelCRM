@@ -99,18 +99,26 @@ export default function MessageList({
     <div 
       ref={containerRef}
       onScroll={handleScroll}
+      role="log"
+      aria-label="Histórico de mensagens da conversa"
+      aria-live="polite"
+      aria-relevant="additions text"
       className="flex-1 overflow-y-auto px-2 py-4 relative flex flex-col justify-start"
     >
       {/* 1. TOPO: CARREGADOR DE MENSAGENS ANTERIORES OU INÍCIO DA CONVERSA */}
       <div className="py-2 flex justify-center shrink-0">
         {loadingMore ? (
-          <div className="flex items-center gap-2 px-3 py-1 rounded-full bg-[var(--sidebar-bg)] border border-[var(--border-light)] text-xs text-[var(--text-secondary)] shadow-xs">
+          <div 
+            role="status"
+            className="flex items-center gap-2 px-3 py-1 rounded-full bg-[var(--sidebar-bg)] border border-[var(--border-light)] text-xs text-[var(--text-secondary)] shadow-xs"
+          >
             <Loader2 size={13} className="animate-spin text-[#00a884]" />
             <span>Carregando mensagens anteriores...</span>
           </div>
         ) : hasMore && onLoadMore ? (
           <button
             type="button"
+            aria-label="Carregar mensagens anteriores desta conversa"
             onClick={() => {
               previousScrollHeightRef.current = containerRef.current?.scrollHeight || 0;
               onLoadMore();

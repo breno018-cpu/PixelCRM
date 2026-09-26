@@ -81,10 +81,20 @@ export default function ConversationItem({
   return (
     <div
       onClick={onSelect}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault();
+          onSelect && onSelect();
+        }
+      }}
+      role="button"
+      tabIndex={0}
+      aria-selected={isSelected}
+      aria-label={`Conversa com ${chat.name || chat.phone}${unreadCount > 0 ? `, ${unreadCount} mensagens não lidas` : ''}`}
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
       className={`
-        flex items-center gap-3 px-3 py-2.5 cursor-pointer transition-colors relative select-none border-b border-[var(--border-light)]/60
+        flex items-center gap-3 px-3 py-2.5 cursor-pointer transition-colors relative select-none border-b border-[var(--border-light)]/60 focus-visible:ring-2 focus-visible:ring-[var(--brand-primary)] focus-visible:outline-none
         ${isSelected 
           ? 'bg-[var(--active-bg)]' 
           : 'hover:bg-[var(--hover-bg)] bg-[var(--sidebar-bg)]'
