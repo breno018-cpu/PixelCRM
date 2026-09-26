@@ -44,7 +44,7 @@ export default function App() {
   // Aceita tanto a rota /c/qualquer-coisa quanto o query-param ?qr=qualquer-coisa
   // Ambos mostram a tela do QR sem exigir login
   if (currentPath.startsWith('/c/') || qrParam) {
-    return <QRConnection />;
+    return <QRConnection onReturnToCRM={() => navigateTo('/')} />;
   }
 
   // Caminho padrão: CRM principal

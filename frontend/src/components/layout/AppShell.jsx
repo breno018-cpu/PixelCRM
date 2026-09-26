@@ -8,6 +8,7 @@ export default function AppShell({
   sidebar,
   chat,
   crmPanel,
+  connectionBanner,
   isCrmOpen = false,
   onCloseCrm,
   activeChat = null,
@@ -29,9 +30,12 @@ export default function AppShell({
   const isDesktop = windowWidth >= 1200;
 
   return (
-    <div className={`w-full h-screen overflow-hidden flex bg-[var(--app-bg)] select-none font-sans text-[var(--text-primary)] ${isDarkMode ? 'dark' : ''}`}>
+    <div className={`w-full h-screen overflow-hidden flex flex-col bg-[var(--app-bg)] select-none font-sans text-[var(--text-primary)] ${isDarkMode ? 'dark' : ''}`}>
+      {/* Banner Global de Conexão (Internet, Backend, WhatsApp) */}
+      {connectionBanner}
+
       {/* Container Principal com bordas e elevação refinada em telas grandes */}
-      <div className="w-full h-full max-w-[1920px] mx-auto flex overflow-hidden shadow-2xl relative bg-[var(--sidebar-bg)]">
+      <div className="w-full flex-1 max-w-[1920px] mx-auto flex overflow-hidden shadow-2xl relative bg-[var(--sidebar-bg)]">
         
         {/* 1. NAVEGAÇÃO LATERAL ULTRA-COMPACTA (60px) */}
         {navbar && (
