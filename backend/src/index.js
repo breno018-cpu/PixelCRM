@@ -621,6 +621,170 @@ app.put('/api/users/:id', authenticateToken, requireRole('ADMIN'), async (req, r
   }
 });
 
+// --- MÉTRICAS ANALÍTICAS DO DASHBOARD (Fase 07) ---
+
+app.get('/api/dashboard/stats', authenticateToken, async (req, res) => {
+  try {
+    const { storeId, assignedUserId } = req.query;
+
+    const chatWhere = {};
+    if (storeId) chatWhere.storeId = storeId;
+    if (assignedUserId) {
+      if (assignedUserId === 'unassigned') {
+        chatWhere.assignedUserId = null;
+      } else {
+        chatWhere.assignedUserId = assignedUserId;
+      }
+    }
+
+    // 1. Total de conversas e distribuição de funil
+    const totalChats = await prisma.chat.count({ where: chatWhere });
+    const archivedChats = await prisma.chat.count({ where: { ...chatWhere, isArchived: true } });
+    const activeChats = totalChats - archivedChats;
+
+    const leadsCount = await prisma.chat.count({ where: { ...chatWhere, funnelStage: 'LEAD', isArchived: false } });
+    const negotiationCount = await prisma.chat.count({ where: { ...chatWhere, funnelStage: 'NEGOTIATION', isArchived: false } });
+    const proposalCount = await prisma.chat.count({ where: { ...chatWhere, funnelStage: 'PROPOSAL', isArchived: false } });
+    const closedCount = await prisma.chat.count({ where: { ...chatWhere, funnelStage: 'CLOSED', isArchived: false } });
+
+    // Taxa de conversão: (fechados / total ativos) * 100
+    const conversionRate = activeChats > 0 ? Number(((closedCount / activeChats) * 100).toFixed(1)) : 0;
+
+    // 2. Mensagens trocadas
+    let messageWhere = {};
+    if (storeId || assignedUserId) {
+      const matchingChats = await prisma.chat.findMany({
+        where: chatWhere,
+        select: { id: true }
+      });
+      messageWhere.chatId = { in: matchingChats.map(c => c.id) };
+    }
+
+    const totalMessages = await prisma.message.count({ where: messageWhere });
+    const sentMessages = await prisma.message.count({ where: { ...messageWhere, fromMe: true } });
+    const receivedMessages = totalMessages - sentMessages;
+
+    // Mensagens hoje
+    const startOfToday = new Date();
+    startOfToday.setHours(0, 0, 0, 0);
+    const todayMessages = await prisma.message.count({
+      where: {
+        ...messageWhere,
+        timestamp: { gte: startOfToday }
+      }
+    });
+
+    // 3. Distribuição por Filial (Lojas)
+    const stores = await prisma.store.findMany({
+      include: {
+        chats: {
+          select: { id: true, funnelStage: true, isArchived: true }
+        },
+        users: {
+          select: { id: true }
+        }
+      }
+    });
+
+    const storesStats = stores.map(s => {
+      const sActiveChats = s.chats.filter(c => !c.isArchived);
+      const sClosed = sActiveChats.filter(c => c.funnelStage === 'CLOSED').length;
+      return {
+        id: s.id,
+        name: s.name,
+        address: s.address,
+        phone: s.phone,
+        totalChats: sActiveChats.length,
+        closedChats: sClosed,
+        operatorsCount: s.users.length,
+        percentOfTotal: activeChats > 0 ? Number(((sActiveChats.length / activeChats) * 100).toFixed(1)) : 0
+      };
+    });
+
+    // 4. Desempenho por Atendente (Equipe)
+    const users = await prisma.user.findMany({
+      select: {
+        id: true,
+        name: true,
+        email: true,
+        role: true,
+        isActive: true,
+        store: { select: { id: true, name: true } },
+        assignedChats: {
+          select: { id: true, funnelStage: true, isArchived: true }
+        }
+      }
+    });
+
+    const teamStats = users.map(u => {
+      const uActiveChats = u.assignedChats.filter(c => !c.isArchived);
+      const uClosed = uActiveChats.filter(c => c.funnelStage === 'CLOSED').length;
+      const uConversion = uActiveChats.length > 0 ? Number(((uClosed / uActiveChats.length) * 100).toFixed(1)) : 0;
+      return {
+        id: u.id,
+        name: u.name || u.email,
+        email: u.email,
+        role: u.role,
+        isActive: u.isActive,
+        storeName: u.store?.name || 'Sem filial',
+        totalAssigned: uActiveChats.length,
+        closedCount: uClosed,
+        conversionRate: uConversion
+      };
+    });
+
+    // 5. Volume dos últimos 7 dias
+    const last7Days = [];
+    for (let i = 6; i >= 0; i--) {
+      const d = new Date();
+      d.setDate(d.getDate() - i);
+      const dayStart = new Date(d.getFullYear(), d.getMonth(), d.getDate(), 0, 0, 0);
+      const dayEnd = new Date(d.getFullYear(), d.getMonth(), d.getDate(), 23, 59, 59);
+
+      const dayCount = await prisma.message.count({
+        where: {
+          ...messageWhere,
+          timestamp: { gte: dayStart, lte: dayEnd }
+        }
+      });
+
+      const dayName = dayStart.toLocaleDateString('pt-BR', { weekday: 'short', day: '2-digit' });
+      last7Days.push({
+        date: dayStart.toISOString().slice(0, 10),
+        label: dayName,
+        count: dayCount
+      });
+    }
+
+    return res.json({
+      summary: {
+        totalChats,
+        activeChats,
+        archivedChats,
+        conversionRate,
+        funnel: {
+          lead: leadsCount,
+          negotiation: negotiationCount,
+          proposal: proposalCount,
+          closed: closedCount
+        },
+        messages: {
+          total: totalMessages,
+          sent: sentMessages,
+          received: receivedMessages,
+          today: todayMessages
+        }
+      },
+      stores: storesStats,
+      team: teamStats,
+      timeline: last7Days
+    });
+  } catch (error) {
+    console.error('[API] Erro ao gerar métricas do dashboard:', error);
+    return res.status(500).json({ error: error.message });
+  }
+});
+
 // --- CONEXÃO WEBSOCKET ---
 
 io.on('connection', (socket) => {

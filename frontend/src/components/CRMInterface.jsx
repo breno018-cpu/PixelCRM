@@ -11,7 +11,7 @@ import {
   Globe, Database, Key, ShoppingBag, Layers, Percent, FileCheck, FileCode, SendHorizontal, Activity,
   Pause, Mic, Download, ChevronUp, ChevronDown, File,
   Building2, Building, UserCheck, UserPlus, ShieldCheck, MapPin,
-  Kanban, LayoutGrid, ArrowRight, Filter
+  Kanban, LayoutGrid, ArrowRight, Filter, TrendingUp, RefreshCw
 } from 'lucide-react';
 
 // LOGO CUSTOMIZADA DA PIXEL LOOM (Intersecção de linhas e tecelagem de pixels)
@@ -248,6 +248,9 @@ export default function CRMInterface({ onGoToConnect, qrToken }) {
     setFilterUserId,
     stores,
     users,
+    dashboardStats,
+    loadingDashboardStats,
+    fetchDashboardStats,
     fetchStores,
     fetchUsers,
     createStore,
@@ -310,7 +313,21 @@ export default function CRMInterface({ onGoToConnect, qrToken }) {
     await updateCRMInfo(chatId, { funnelStage: newStage });
   };
 
-  const [activeTab, setActiveTab] = useState('chats'); // 'chats' | 'kanban'
+  // Dashboard Analítico Real (Fase 07)
+  const [dashStoreFilter, setDashStoreFilter] = useState('');
+  const [dashUserFilter, setDashUserFilter] = useState('');
+
+  const [activeTab, setActiveTab] = useState('chats'); // 'chats' | 'kanban' | 'dashboard'
+
+  // Efeito para carregar métricas do dashboard
+  useEffect(() => {
+    if (activeTab === 'dashboard' && isLoggedIn) {
+      fetchDashboardStats({
+        storeId: dashStoreFilter,
+        assignedUserId: dashUserFilter
+      });
+    }
+  }, [activeTab, dashStoreFilter, dashUserFilter, isLoggedIn, fetchDashboardStats]);
   const [messageInput, setMessageInput] = useState('');
   const [isSendingMessage, setIsSendingMessage] = useState(false);
   const [sendError, setSendError] = useState('');
@@ -832,6 +849,21 @@ export default function CRMInterface({ onGoToConnect, qrToken }) {
               title="Pipeline Comercial (Kanban)"
             >
               <Kanban size={22} />
+            </button>
+
+            {/* Dashboard & Métricas Analíticas */}
+            <button
+              onClick={() => {
+                setActiveTab('dashboard');
+              }}
+              className={`w-11 h-11 rounded-full flex items-center justify-center transition-all relative ${
+                activeTab === 'dashboard'
+                  ? 'bg-[#eae6df] text-[#00a884]'
+                  : 'text-[#54656f] hover:bg-[#eae6df] hover:text-[#111b21]'
+              }`}
+              title="Dashboard & Inteligência Comercial"
+            >
+              <BarChart3 size={22} />
             </button>
 
             {/* Arquivados */}
@@ -2120,6 +2152,323 @@ export default function CRMInterface({ onGoToConnect, qrToken }) {
                 </div>
               );
             })}
+          </div>
+        </div>
+      )}
+
+      {/* 4. DASHBOARD VIEW (Fase 07 - Dashboard Real & Métricas Analíticas) */}
+      {activeTab === 'dashboard' && (
+        <div className="flex-1 overflow-y-auto h-full bg-[#f8f9fa] flex flex-col">
+          {/* Header do Dashboard */}
+          <header className="h-[65px] bg-white border-b border-[#e9edef] px-6 flex items-center justify-between shrink-0 shadow-sm sticky top-0 z-10">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl bg-[#00a884]/10 text-[#00a884] flex items-center justify-center font-bold">
+                <BarChart3 size={22} />
+              </div>
+              <div>
+                <h2 className="text-sm font-bold text-[#111b21]">Dashboard & Inteligência Comercial</h2>
+                <p className="text-[10px] text-[#667781]">Métricas consolidadas em tempo real direto do banco SQLite</p>
+              </div>
+            </div>
+
+            {/* Controles de Filtros e Recarga */}
+            <div className="flex items-center gap-2.5">
+              {/* Filtro por Filial */}
+              <select
+                value={dashStoreFilter}
+                onChange={(e) => setDashStoreFilter(e.target.value)}
+                className="text-xs bg-[#f0f2f5] text-[#111b21] border border-[#e9edef] rounded-lg px-2.5 py-1.5 font-medium focus:outline-none focus:ring-1 focus:ring-[#00a884]"
+              >
+                <option value="">Todas as Filiais ({stores.length})</option>
+                {stores.map(s => (
+                  <option key={s.id} value={s.id}>{s.name}</option>
+                ))}
+              </select>
+
+              {/* Filtro por Atendente */}
+              <select
+                value={dashUserFilter}
+                onChange={(e) => setDashUserFilter(e.target.value)}
+                className="text-xs bg-[#f0f2f5] text-[#111b21] border border-[#e9edef] rounded-lg px-2.5 py-1.5 font-medium focus:outline-none focus:ring-1 focus:ring-[#00a884]"
+              >
+                <option value="">Todos Atendentes</option>
+                <option value="unassigned">Não Atribuídos</option>
+                {currentUser && (
+                  <option value={currentUser.id}>Meus ({currentUser.name || currentUser.email})</option>
+                )}
+                {users.filter(u => !currentUser || u.id !== currentUser.id).map(u => (
+                  <option key={u.id} value={u.id}>{u.name || u.email}</option>
+                ))}
+              </select>
+
+              {/* Botão de Atualizar Métricas */}
+              <button
+                onClick={() => fetchDashboardStats({ storeId: dashStoreFilter, assignedUserId: dashUserFilter })}
+                disabled={loadingDashboardStats}
+                className="p-2 bg-white hover:bg-[#f0f2f5] text-[#54656f] hover:text-[#00a884] border border-[#e9edef] rounded-lg transition-all shadow-sm"
+                title="Atualizar Métricas"
+              >
+                <RefreshCw size={15} className={loadingDashboardStats ? 'animate-spin text-[#00a884]' : ''} />
+              </button>
+
+              {/* Botão Voltar para Conversas */}
+              <button
+                onClick={() => setActiveTab('chats')}
+                className="px-3 py-1.5 bg-[#00a884] hover:bg-emerald-600 text-white text-xs font-bold rounded-lg flex items-center gap-1.5 shadow-sm transition-all ml-1"
+              >
+                <MessageSquare size={13} />
+                <span>Ir para Chats</span>
+              </button>
+            </div>
+          </header>
+
+          {/* Conteúdo Principal do Dashboard */}
+          <div className="p-6 max-w-7xl mx-auto w-full space-y-6">
+            {loadingDashboardStats && !dashboardStats ? (
+              <div className="flex flex-col items-center justify-center p-20 gap-3 text-slate-500">
+                <Loader2 className="animate-spin text-[#00a884]" size={32} />
+                <span className="text-xs font-medium">Carregando indicadores do banco de dados...</span>
+              </div>
+            ) : dashboardStats ? (
+              <>
+                {/* 1. CARDS DE KPI PRINCIPAIS */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                  {/* KPI 1: Total de Leads */}
+                  <div className="bg-white p-4 rounded-2xl border border-[#e9edef] shadow-sm flex items-center gap-4">
+                    <div className="w-12 h-12 rounded-xl bg-sky-50 text-sky-600 flex items-center justify-center border border-sky-100 shrink-0">
+                      <Users size={24} />
+                    </div>
+                    <div>
+                      <p className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Total de Leads</p>
+                      <h3 className="text-2xl font-bold text-[#111b21] mt-0.5">{dashboardStats.summary.totalChats}</h3>
+                      <p className="text-[10px] text-slate-500 mt-0.5">
+                        <span className="font-semibold text-sky-700">{dashboardStats.summary.activeChats} ativos</span> • {dashboardStats.summary.archivedChats} arquivados
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* KPI 2: Taxa de Conversão */}
+                  <div className="bg-white p-4 rounded-2xl border border-[#e9edef] shadow-sm flex items-center gap-4">
+                    <div className="w-12 h-12 rounded-xl bg-purple-50 text-purple-600 flex items-center justify-center border border-purple-100 shrink-0">
+                      <Award size={24} />
+                    </div>
+                    <div>
+                      <p className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Taxa de Conversão</p>
+                      <h3 className="text-2xl font-bold text-[#111b21] mt-0.5">{dashboardStats.summary.conversionRate}%</h3>
+                      <p className="text-[10px] text-slate-500 mt-0.5">
+                        <span className="font-semibold text-purple-700">{dashboardStats.summary.funnel.closed} contratos</span> fechados
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* KPI 3: Em Andamento */}
+                  <div className="bg-white p-4 rounded-2xl border border-[#e9edef] shadow-sm flex items-center gap-4">
+                    <div className="w-12 h-12 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center border border-amber-100 shrink-0">
+                      <TrendingUp size={24} />
+                    </div>
+                    <div>
+                      <p className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Oportunidades</p>
+                      <h3 className="text-2xl font-bold text-[#111b21] mt-0.5">
+                        {dashboardStats.summary.funnel.negotiation + dashboardStats.summary.funnel.proposal}
+                      </h3>
+                      <p className="text-[10px] text-slate-500 mt-0.5">
+                        {dashboardStats.summary.funnel.negotiation} negoc. • {dashboardStats.summary.funnel.proposal} propostas
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* KPI 4: Mensagens Trocadas */}
+                  <div className="bg-white p-4 rounded-2xl border border-[#e9edef] shadow-sm flex items-center gap-4">
+                    <div className="w-12 h-12 rounded-xl bg-emerald-50 text-[#00a884] flex items-center justify-center border border-emerald-100 shrink-0">
+                      <MessageSquare size={24} />
+                    </div>
+                    <div>
+                      <p className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Mensagens Trocadas</p>
+                      <h3 className="text-2xl font-bold text-[#111b21] mt-0.5">{dashboardStats.summary.messages.total}</h3>
+                      <p className="text-[10px] text-slate-500 mt-0.5">
+                        <span className="font-semibold text-emerald-700">{dashboardStats.summary.messages.today} hoje</span> • {dashboardStats.summary.messages.sent} env / {dashboardStats.summary.messages.received} rec
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+                {/* 2. GRÁFICOS: FUNIL COMERCIAL + ATIVIDADE ÚLTIMOS 7 DIAS */}
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                  {/* Funil Visual de Conversão */}
+                  <div className="bg-white p-5 rounded-2xl border border-[#e9edef] shadow-sm space-y-4">
+                    <div className="flex items-center justify-between pb-3 border-b border-[#e9edef]">
+                      <div className="flex items-center gap-2">
+                        <Award size={18} className="text-[#00a884]" />
+                        <h4 className="text-xs font-bold text-[#111b21] uppercase tracking-wide">
+                          Distribuição do Funil Comercial
+                        </h4>
+                      </div>
+                      <span className="text-[11px] text-slate-500 font-semibold">
+                        {dashboardStats.summary.activeChats} leads ativos
+                      </span>
+                    </div>
+
+                    <div className="space-y-3.5">
+                      {[
+                        { label: 'Leads Novos', count: dashboardStats.summary.funnel.lead, color: 'bg-sky-500', barBg: 'bg-sky-100', text: 'text-sky-700' },
+                        { label: 'Em Negociação', count: dashboardStats.summary.funnel.negotiation, color: 'bg-amber-500', barBg: 'bg-amber-100', text: 'text-amber-700' },
+                        { label: 'Proposta Enviada', count: dashboardStats.summary.funnel.proposal, color: 'bg-purple-500', barBg: 'bg-purple-100', text: 'text-purple-700' },
+                        { label: 'Contrato Fechado', count: dashboardStats.summary.funnel.closed, color: 'bg-[#00a884]', barBg: 'bg-emerald-100', text: 'text-emerald-700' },
+                      ].map((stage, idx) => {
+                        const total = dashboardStats.summary.activeChats || 1;
+                        const pct = Math.round((stage.count / total) * 100);
+
+                        return (
+                          <div key={idx} className="space-y-1">
+                            <div className="flex justify-between items-center text-xs">
+                              <span className="font-semibold text-slate-700">{stage.label}</span>
+                              <span className="font-bold text-[#111b21]">
+                                {stage.count} <span className="text-[10px] text-slate-500 font-normal">({pct}%)</span>
+                              </span>
+                            </div>
+                            <div className="w-full bg-slate-100 rounded-full h-2 overflow-hidden">
+                              <div
+                                className={`h-full ${stage.color} transition-all duration-700 rounded-full`}
+                                style={{ width: `${Math.max(pct, stage.count > 0 ? 4 : 0)}%` }}
+                              />
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+
+                  {/* Volume de Mensagens nos Últimos 7 Dias */}
+                  <div className="bg-white p-5 rounded-2xl border border-[#e9edef] shadow-sm space-y-4 flex flex-col justify-between">
+                    <div className="flex items-center justify-between pb-3 border-b border-[#e9edef]">
+                      <div className="flex items-center gap-2">
+                        <Activity size={18} className="text-[#00a884]" />
+                        <h4 className="text-xs font-bold text-[#111b21] uppercase tracking-wide">
+                          Volume de Mensagens (Últimos 7 dias)
+                        </h4>
+                      </div>
+                      <span className="text-[11px] text-slate-500 font-semibold">
+                        Total: {dashboardStats.summary.messages.total} msgs
+                      </span>
+                    </div>
+
+                    {/* Gráfico de Barras em CSS */}
+                    <div className="h-44 flex items-end justify-between gap-3 pt-6 px-2">
+                      {dashboardStats.timeline.map((day, idx) => {
+                        const maxVal = Math.max(...dashboardStats.timeline.map(d => d.count), 5);
+                        const heightPct = Math.round((day.count / maxVal) * 100);
+
+                        return (
+                          <div key={idx} className="flex-1 flex flex-col items-center gap-1.5 h-full justify-end group">
+                            <span className="text-[9px] font-bold text-slate-500 group-hover:text-[#00a884] transition-colors">
+                              {day.count}
+                            </span>
+                            <div className="w-full max-w-[28px] bg-slate-100 rounded-t-lg overflow-hidden flex items-end h-32">
+                              <div
+                                className="w-full bg-[#00a884] group-hover:bg-emerald-500 transition-all rounded-t-lg"
+                                style={{ height: `${Math.max(heightPct, day.count > 0 ? 8 : 2)}%` }}
+                              />
+                            </div>
+                            <span className="text-[9px] font-medium text-slate-500 uppercase truncate max-w-full">
+                              {day.label}
+                            </span>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                </div>
+
+                {/* 3. DESEMPENHO POR FILIAL & EQUIPE */}
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                  {/* Desempenho por Filial */}
+                  <div className="bg-white p-5 rounded-2xl border border-[#e9edef] shadow-sm space-y-4">
+                    <div className="flex items-center justify-between pb-3 border-b border-[#e9edef]">
+                      <div className="flex items-center gap-2">
+                        <Building size={18} className="text-[#00a884]" />
+                        <h4 className="text-xs font-bold text-[#111b21] uppercase tracking-wide">
+                          Distribuição por Filial ({dashboardStats.stores.length})
+                        </h4>
+                      </div>
+                    </div>
+
+                    <div className="space-y-3">
+                      {dashboardStats.stores.length === 0 ? (
+                        <p className="text-xs text-slate-400 italic text-center py-6">Nenhuma filial cadastrada.</p>
+                      ) : (
+                        dashboardStats.stores.map((store) => (
+                          <div key={store.id} className="p-3 bg-[#f8f9fa] rounded-xl border border-[#e9edef] flex items-center justify-between">
+                            <div className="space-y-0.5">
+                              <h5 className="text-xs font-bold text-[#111b21]">{store.name}</h5>
+                              <p className="text-[10px] text-slate-500">{store.address || 'Sem endereço informado'}</p>
+                              <div className="flex items-center gap-2 pt-1">
+                                <span className="text-[9px] bg-sky-50 text-sky-700 font-semibold px-1.5 py-0.5 rounded">
+                                  {store.operatorsCount} {store.operatorsCount === 1 ? 'operador' : 'operadores'}
+                                </span>
+                                <span className="text-[9px] bg-emerald-50 text-emerald-700 font-semibold px-1.5 py-0.5 rounded">
+                                  {store.closedChats} fechados
+                                </span>
+                              </div>
+                            </div>
+                            <div className="text-right">
+                              <p className="text-base font-bold text-[#111b21]">{store.totalChats}</p>
+                              <p className="text-[10px] text-slate-500">{store.percentOfTotal}% do total</p>
+                            </div>
+                          </div>
+                        ))
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Desempenho da Equipe */}
+                  <div className="bg-white p-5 rounded-2xl border border-[#e9edef] shadow-sm space-y-4">
+                    <div className="flex items-center justify-between pb-3 border-b border-[#e9edef]">
+                      <div className="flex items-center gap-2">
+                        <Users size={18} className="text-[#00a884]" />
+                        <h4 className="text-xs font-bold text-[#111b21] uppercase tracking-wide">
+                          Produtividade da Equipe ({dashboardStats.team.length})
+                        </h4>
+                      </div>
+                    </div>
+
+                    <div className="space-y-3">
+                      {dashboardStats.team.length === 0 ? (
+                        <p className="text-xs text-slate-400 italic text-center py-6">Nenhum atendente cadastrado.</p>
+                      ) : (
+                        dashboardStats.team.map((member) => (
+                          <div key={member.id} className="p-3 bg-[#f8f9fa] rounded-xl border border-[#e9edef] flex items-center justify-between">
+                            <div className="flex items-center gap-3">
+                              <div className="w-9 h-9 rounded-full bg-slate-200 text-slate-700 font-bold text-xs flex items-center justify-center shrink-0">
+                                {member.name ? member.name.charAt(0).toUpperCase() : <User size={14} />}
+                              </div>
+                              <div className="space-y-0.5">
+                                <div className="flex items-center gap-1.5">
+                                  <h5 className="text-xs font-bold text-[#111b21]">{member.name}</h5>
+                                  <span className={`text-[8.5px] font-bold px-1.5 py-0.5 rounded ${
+                                    member.role === 'ADMIN' ? 'bg-purple-100 text-purple-700' : 'bg-sky-100 text-sky-700'
+                                  }`}>
+                                    {member.role === 'ADMIN' ? 'Admin' : 'Operador'}
+                                  </span>
+                                </div>
+                                <p className="text-[10px] text-slate-500">{member.storeName}</p>
+                              </div>
+                            </div>
+                            <div className="text-right">
+                              <p className="text-xs font-bold text-[#111b21]">
+                                {member.totalAssigned} <span className="text-[9px] text-slate-500 font-normal">atribuídos</span>
+                              </p>
+                              <p className="text-[10px] text-emerald-600 font-bold">
+                                {member.closedCount} fechados ({member.conversionRate}%)
+                              </p>
+                            </div>
+                          </div>
+                        ))
+                      )}
+                    </div>
+                  </div>
+                </div>
+              </>
+            ) : null}
           </div>
         </div>
       )}

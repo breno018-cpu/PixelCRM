@@ -50,6 +50,10 @@ export const CRMProvider = ({ children }) => {
   // true = pode ter mais | false = chegou ao início da conversa
   const [hasMoreMap, setHasMoreMap] = useState({});
 
+  // Métricas do Dashboard Real (Fase 07)
+  const [dashboardStats, setDashboardStats] = useState(null);
+  const [loadingDashboardStats, setLoadingDashboardStats] = useState(false);
+
   // Busca a lista de chats da API
   const fetchChats = useCallback(async () => {
     setLoadingChats(true);
@@ -471,6 +475,26 @@ export const CRMProvider = ({ children }) => {
     }
   };
 
+  // Busca métricas consolidadas do dashboard
+  const fetchDashboardStats = useCallback(async (filters = {}) => {
+    setLoadingDashboardStats(true);
+    try {
+      const params = new URLSearchParams();
+      if (filters.storeId) params.append('storeId', filters.storeId);
+      if (filters.assignedUserId) params.append('assignedUserId', filters.assignedUserId);
+      const response = await authFetch(`${backendUrl}/api/dashboard/stats?${params.toString()}`);
+      if (response.ok) {
+        const data = await response.json();
+        setDashboardStats(data);
+        return data;
+      }
+    } catch (e) {
+      console.error('[CRM] Erro ao buscar métricas do dashboard:', e);
+    } finally {
+      setLoadingDashboardStats(false);
+    }
+  }, [backendUrl]);
+
   return (
     <CRMContext.Provider value={{
       chats,
@@ -488,6 +512,9 @@ export const CRMProvider = ({ children }) => {
       setFilterUserId,
       stores,
       users,
+      dashboardStats,
+      loadingDashboardStats,
+      fetchDashboardStats,
       fetchStores,
       fetchUsers,
       createStore,
