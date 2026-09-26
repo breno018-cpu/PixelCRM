@@ -30,7 +30,7 @@ function formatConversationTime(timestamp) {
   return date.toLocaleDateString([], { day: '2-digit', month: '2-digit', year: '2-digit' });
 }
 
-export default function ConversationItem({
+function ConversationItem({
   chat,
   isSelected = false,
   onSelect,
@@ -232,3 +232,19 @@ export default function ConversationItem({
     </div>
   );
 }
+
+export default React.memo(ConversationItem, (prevProps, nextProps) => {
+  return (
+    prevProps.chat.id === nextProps.chat.id &&
+    prevProps.chat.updatedAt === nextProps.chat.updatedAt &&
+    prevProps.chat.unreadCount === nextProps.chat.unreadCount &&
+    prevProps.chat.lastMessageTime === nextProps.chat.lastMessageTime &&
+    prevProps.chat.funnelStage === nextProps.chat.funnelStage &&
+    prevProps.chat.name === nextProps.chat.name &&
+    prevProps.chat.tags === nextProps.chat.tags &&
+    prevProps.isSelected === nextProps.isSelected &&
+    prevProps.isArchivedView === nextProps.isArchivedView &&
+    prevProps.syncProgress?.percent === nextProps.syncProgress?.percent &&
+    prevProps.syncProgress?.status === nextProps.syncProgress?.status
+  );
+});

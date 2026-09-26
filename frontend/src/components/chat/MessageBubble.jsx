@@ -30,7 +30,7 @@ function highlightSearchTerm(text, query) {
   );
 }
 
-export default function MessageBubble({
+function MessageBubble({
   message,
   searchQuery = '',
   mediaComponent = null,
@@ -122,3 +122,14 @@ export default function MessageBubble({
     </div>
   );
 }
+
+export default React.memo(MessageBubble, (prev, next) => {
+  return (
+    prev.message.id === next.message.id &&
+    prev.message.status === next.message.status &&
+    prev.message.text === next.message.text &&
+    prev.message.mediaUrl === next.message.mediaUrl &&
+    prev.message.timestamp === next.message.timestamp &&
+    prev.searchQuery === next.searchQuery
+  );
+});
