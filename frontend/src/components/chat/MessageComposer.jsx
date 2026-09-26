@@ -92,13 +92,13 @@ export default function MessageComposer({
       {showEmojiPicker && (
         <>
           <div className="fixed inset-0 z-20" onClick={() => setShowEmojiPicker(false)} />
-          <div className="absolute bottom-16 left-3 bg-[var(--sidebar-bg)] border border-[var(--border-light)] rounded-2xl p-2 shadow-xl z-30 flex items-center gap-1.5 animate-fade-in">
+          <div className="absolute bottom-16 left-3 bg-[var(--sidebar-bg)] border border-[var(--border-light)] rounded-2xl p-2 shadow-xl z-30 flex items-center gap-1.5 animate-pop-in">
             {quickEmojis.map((emoji) => (
               <button
                 key={emoji}
                 type="button"
                 onClick={() => addEmoji(emoji)}
-                className="w-8 h-8 rounded-lg hover:bg-[var(--active-bg)] text-base flex items-center justify-center transition-transform hover:scale-125"
+                className="w-8 h-8 rounded-lg hover:bg-[var(--active-bg)] text-base flex items-center justify-center transition-transform hover:scale-125 active:scale-95"
               >
                 {emoji}
               </button>
@@ -111,7 +111,7 @@ export default function MessageComposer({
       {showAttachMenu && (
         <>
           <div className="fixed inset-0 z-20" onClick={() => setShowAttachMenu(false)} />
-          <div className="absolute bottom-16 left-12 bg-[var(--sidebar-bg)] border border-[var(--border-light)] rounded-2xl p-2 shadow-xl z-30 flex flex-col gap-1 w-44 animate-fade-in text-xs font-semibold text-[var(--text-primary)]">
+          <div className="absolute bottom-16 left-12 bg-[var(--sidebar-bg)] border border-[var(--border-light)] rounded-2xl p-2 shadow-xl z-30 flex flex-col gap-1 w-44 animate-pop-in text-xs font-semibold text-[var(--text-primary)]">
             <button
               type="button"
               onClick={() => {

@@ -38,7 +38,7 @@ export default function FilterChips({
           <button
             type="button"
             onClick={() => setFilterUnreadOnly(prev => !prev)}
-            className={`px-2.5 py-1 rounded-full text-[11px] font-semibold transition-all shrink-0 border ${
+            className={`px-2.5 py-1 rounded-full text-[11px] font-semibold transition-all shrink-0 border btn-tactile active:scale-95 ${
               filterUnreadOnly
                 ? 'bg-[#00a884] text-white border-[#00a884] shadow-xs'
                 : 'bg-[var(--header-bg)] text-[var(--text-secondary)] border-transparent hover:border-[var(--border-medium)]'
@@ -61,7 +61,7 @@ export default function FilterChips({
                 if (setFilterUnreadOnly) setFilterUnreadOnly(false);
                 setFilterFunnelStage(stage.key);
               }}
-              className={`px-2.5 py-1 rounded-full text-[11px] font-semibold transition-all shrink-0 border flex items-center gap-1.5 ${
+              className={`px-2.5 py-1 rounded-full text-[11px] font-semibold transition-all shrink-0 border flex items-center gap-1.5 btn-tactile active:scale-95 ${
                 isSelected
                   ? 'bg-[var(--active-bg)] text-[#00a884] border-[#00a884] shadow-xs font-bold'
                   : 'bg-[var(--header-bg)] text-[var(--text-secondary)] border-transparent hover:border-[var(--border-medium)] hover:text-[var(--text-primary)]'

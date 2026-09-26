@@ -77,7 +77,7 @@ export default function MessageBubble({
     >
       <div
         className={`
-          relative max-w-[85%] sm:max-w-[75%] md:max-w-[65%] rounded-2xl px-3.5 py-2 shadow-xs transition-colors
+          relative max-w-[85%] sm:max-w-[75%] md:max-w-[65%] rounded-2xl px-3.5 py-2 shadow-xs transition-colors animate-message-in
           ${isMe
             ? 'bg-[var(--bubble-out)] text-[var(--text-primary)] rounded-tr-xs'
             : 'bg-[var(--bubble-in)] text-[var(--text-primary)] rounded-tl-xs border border-[var(--border-light)]/40'
