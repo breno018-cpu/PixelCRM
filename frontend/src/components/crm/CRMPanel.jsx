@@ -25,6 +25,8 @@ import { TOKENS } from '../../design-system/tokens';
 import CustomerProfile from './CustomerProfile';
 import AssignmentSelector from './AssignmentSelector';
 import FunnelStepper from './FunnelStepper';
+import TagsManager from './TagsManager';
+import NotesSection from './NotesSection';
 
 /**
  * CRMPanel
@@ -265,47 +267,12 @@ export default function CRMPanel({
         {activeTab === 'notes' && (
           <div className="space-y-3 flex-1 flex flex-col animate-fade-in">
             {notesSectionSlot ? notesSectionSlot : (
-              <>
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-1.5">
-                    <FileText size={15} className="text-[var(--brand-primary,#00a884)]" />
-                    <span className="text-xs font-bold text-[var(--text-primary,#111b21)]">
-                      Anotações Comerciais
-                    </span>
-                  </div>
-                  {notesSavedAlert && (
-                    <span className="text-[11px] text-[var(--brand-primary,#00a884)] font-bold animate-pulse flex items-center gap-1">
-                      <Check size={12} />
-                      Salvo!
-                    </span>
-                  )}
-                </div>
-
-                <p className="text-[11px] text-[var(--text-secondary,#667781)]">
-                  Registre informações chave: interesse em motos, formas de pagamento ou preferências do lead.
-                </p>
-
-                <textarea
-                  value={localNotes}
-                  onChange={(e) => setLocalNotes(e.target.value)}
-                  placeholder="Ex: Cliente tem interesse na Shineray Storm 200. Pretende dar entrada de 5 mil..."
-                  rows={8}
-                  className="w-full bg-[var(--active-bg,#f0f2f5)] border border-[var(--border-subtle,#e9edef)] rounded-xl p-3 text-xs text-[var(--text-primary,#111b21)] placeholder-[var(--text-secondary,#667781)] focus:outline-none focus:ring-1 focus:ring-[var(--brand-primary,#00a884)] resize-none"
-                />
-
-                <button
-                  onClick={handleSaveNotesClick}
-                  disabled={isSavingNotes}
-                  className="w-full py-2.5 rounded-xl bg-[var(--brand-primary,#00a884)] hover:bg-[#008f6f] disabled:opacity-50 text-white font-bold text-xs inline-flex items-center justify-center gap-1.5 shadow-sm active:scale-95 transition-all"
-                >
-                  {isSavingNotes ? (
-                    <Loader2 size={13} className="animate-spin" />
-                  ) : (
-                    <Save size={13} />
-                  )}
-                  <span>{isSavingNotes ? 'Salvando...' : 'Salvar Anotações'}</span>
-                </button>
-              </>
+              <NotesSection
+                activeChat={activeChat}
+                onSaveNotes={onSaveNotes}
+                isSavingNotes={isSavingNotes}
+                notesSavedAlert={notesSavedAlert}
+              />
             )}
           </div>
         )}
@@ -314,90 +281,11 @@ export default function CRMPanel({
         {activeTab === 'tags' && (
           <div className="space-y-4 animate-fade-in">
             {tagsManagerSlot ? tagsManagerSlot : (
-              <>
-                <div className="space-y-2">
-                  <div className="flex items-center gap-1.5">
-                    <Tag size={15} className="text-[var(--brand-primary,#00a884)]" />
-                    <span className="text-xs font-bold text-[var(--text-primary,#111b21)]">
-                      Classificadores e Etiquetas
-                    </span>
-                  </div>
-                  
-                  {/* Formulário de criação de tag */}
-                  <form onSubmit={handleAddTagSubmit} className="flex gap-2">
-                    <input
-                      type="text"
-                      placeholder="Nova tag (ex: Consórcio)..."
-                      value={tagInput}
-                      onChange={(e) => setTagInput(e.target.value)}
-                      className="flex-1 bg-[var(--active-bg,#f0f2f5)] border border-[var(--border-subtle,#e9edef)] rounded-lg px-2.5 py-1.5 text-xs text-[var(--text-primary,#111b21)] focus:outline-none focus:ring-1 focus:ring-[var(--brand-primary,#00a884)]"
-                    />
-                    <button
-                      type="submit"
-                      disabled={!tagInput.trim()}
-                      className="px-3 bg-[var(--brand-primary,#00a884)] hover:bg-[#008f6f] disabled:opacity-40 text-white rounded-lg font-bold text-xs flex items-center justify-center transition-all active:scale-95 shadow-xs"
-                    >
-                      <Plus size={14} />
-                    </button>
-                  </form>
-                </div>
-
-                {/* Tags Atuais com botão de exclusão */}
-                <div className="space-y-2">
-                  <span className="text-[10px] font-bold text-[var(--text-secondary,#667781)] uppercase tracking-wider block">
-                    Etiquetas deste Cliente
-                  </span>
-                  <div className="flex flex-wrap gap-1.5 min-h-[40px] p-2.5 rounded-xl bg-[var(--active-bg,#f0f2f5)]/60 border border-[var(--border-subtle,#e9edef)]">
-                    {currentTags.length > 0 ? (
-                      currentTags.map((tag, idx) => (
-                        <span
-                          key={idx}
-                          className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-[var(--bg-panel,#ffffff)] border border-[var(--border-subtle,#e9edef)] text-[11px] font-bold text-[var(--text-primary,#111b21)] shadow-xs"
-                        >
-                          <span>#{tag}</span>
-                          <button
-                            onClick={() => onRemoveTag && onRemoveTag(tag)}
-                            className="text-[var(--text-secondary,#667781)] hover:text-rose-500 transition-colors p-0.5"
-                            title={`Remover tag ${tag}`}
-                          >
-                            <X size={11} />
-                          </button>
-                        </span>
-                      ))
-                    ) : (
-                      <span className="text-xs text-[var(--text-secondary,#667781)] italic">
-                        Nenhuma etiqueta atribuída.
-                      </span>
-                    )}
-                  </div>
-                </div>
-
-                {/* Sugestões Rápidas de Tags */}
-                <div className="space-y-2">
-                  <span className="text-[10px] font-bold text-[var(--text-secondary,#667781)] uppercase tracking-wider block">
-                    Sugestões Rápidas
-                  </span>
-                  <div className="flex flex-wrap gap-1.5">
-                    {quickTags.map((qTag) => {
-                      const isAdded = currentTags.includes(qTag);
-                      return (
-                        <button
-                          key={qTag}
-                          disabled={isAdded}
-                          onClick={() => onAddTag && onAddTag(qTag)}
-                          className={`px-2.5 py-1 rounded-lg text-[10px] font-semibold transition-all border ${
-                            isAdded
-                              ? 'bg-[var(--brand-primary,#00a884)]/10 text-[var(--brand-primary,#00a884)] border-[var(--brand-primary,#00a884)]/30 opacity-60 cursor-default'
-                              : 'bg-[var(--bg-panel,#ffffff)] hover:bg-[var(--active-bg,#f0f2f5)] text-[var(--text-primary,#111b21)] border-[var(--border-subtle,#e9edef)] active:scale-95'
-                          }`}
-                        >
-                          + {qTag}
-                        </button>
-                      );
-                    })}
-                  </div>
-                </div>
-              </>
+              <TagsManager
+                activeChat={activeChat}
+                onAddTag={onAddTag}
+                onRemoveTag={onRemoveTag}
+              />
             )}
           </div>
         )}
