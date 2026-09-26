@@ -24,6 +24,7 @@ import { TOKENS } from '../../design-system/tokens';
 
 import CustomerProfile from './CustomerProfile';
 import AssignmentSelector from './AssignmentSelector';
+import FunnelStepper from './FunnelStepper';
 
 /**
  * CRMPanel
@@ -252,68 +253,10 @@ export default function CRMPanel({
         {activeTab === 'funnel' && (
           <div className="space-y-4 animate-fade-in">
             {funnelStepperSlot ? funnelStepperSlot : (
-              <div className="space-y-3">
-                <div className="flex items-center gap-2">
-                  <TrendingUp size={16} className="text-[var(--brand-primary,#00a884)]" />
-                  <span className="text-xs font-bold text-[var(--text-primary,#111b21)]">
-                    Estágio no Pipeline de Vendas
-                  </span>
-                </div>
-
-                <div className="space-y-2">
-                  {['LEAD', 'NEGOTIATION', 'PROPOSAL', 'CLOSED'].map((stageKey) => {
-                    const token = TOKENS.colors.funnel[stageKey];
-                    const isSelected = funnelStage === stageKey;
-
-                    return (
-                      <button
-                        key={stageKey}
-                        onClick={() => onUpdateFunnelStage && onUpdateFunnelStage(activeChat.id, stageKey)}
-                        className={`w-full p-3 rounded-xl border text-left flex items-center justify-between transition-all ${
-                          isSelected
-                            ? 'border-l-4 shadow-sm'
-                            : 'bg-[var(--bg-panel,#ffffff)] border-[var(--border-subtle,#e9edef)] hover:bg-[var(--active-bg,#f0f2f5)]'
-                        }`}
-                        style={{
-                          backgroundColor: isSelected ? token.bg : undefined,
-                          borderColor: isSelected ? token.color : undefined,
-                          borderLeftWidth: isSelected ? '4px' : undefined
-                        }}
-                      >
-                        <div className="flex items-center gap-2.5">
-                          <span 
-                            className="w-2.5 h-2.5 rounded-full" 
-                            style={{ backgroundColor: token.color }} 
-                          />
-                          <div>
-                            <span 
-                              className="text-xs font-bold block"
-                              style={{ color: isSelected ? token.color : 'inherit' }}
-                            >
-                              {token.label}
-                            </span>
-                            <span className="text-[10px] text-[var(--text-secondary,#667781)]">
-                              {stageKey === 'LEAD' && 'Primeiro contato realizado'}
-                              {stageKey === 'NEGOTIATION' && 'Interesse em modelos ou cotação'}
-                              {stageKey === 'PROPOSAL' && 'Simulação ou proposta formal enviada'}
-                              {stageKey === 'CLOSED' && 'Venda concluída com sucesso!'}
-                            </span>
-                          </div>
-                        </div>
-
-                        {isSelected && (
-                          <div 
-                            className="w-5 h-5 rounded-full flex items-center justify-center text-white shrink-0"
-                            style={{ backgroundColor: token.color }}
-                          >
-                            <Check size={12} />
-                          </div>
-                        )}
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
+              <FunnelStepper
+                activeChat={activeChat}
+                onUpdateFunnelStage={onUpdateFunnelStage}
+              />
             )}
           </div>
         )}
