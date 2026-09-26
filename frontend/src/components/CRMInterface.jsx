@@ -11,7 +11,8 @@ import {
   Globe, Database, Key, ShoppingBag, Layers, Percent, FileCheck, FileCode, SendHorizontal, Activity,
   Pause, Mic, Download, ChevronUp, ChevronDown, File,
   Building2, Building, UserCheck, UserPlus, ShieldCheck, MapPin,
-  Kanban, LayoutGrid, ArrowRight, Filter, TrendingUp, RefreshCw
+  Kanban, LayoutGrid, ArrowRight, Filter, TrendingUp, RefreshCw,
+  Copy, Eye, EyeOff, Wand2
 } from 'lucide-react';
 
 // LOGO CUSTOMIZADA DA PIXEL LOOM (Intersecção de linhas e tecelagem de pixels)
@@ -252,6 +253,12 @@ export default function CRMInterface({ onGoToConnect, qrToken }) {
     loadingAutomations,
     fetchAutomations,
     updateAutomation,
+    aiConfig,
+    loadingAiConfig,
+    fetchAiConfig,
+    updateAiConfig,
+    testAiConnection,
+    requestAiSuggestion,
     dashboardStats,
     loadingDashboardStats,
     fetchDashboardStats,
@@ -425,6 +432,126 @@ export default function CRMInterface({ onGoToConnect, qrToken }) {
   const [notesSavedAlert, setNotesSavedAlert] = useState(false);
   const [showCrmPanel, setShowCrmPanel] = useState(false); // Controla o painel lateral de CRM/Contato
   const [hoveredChatId, setHoveredChatId] = useState(null);
+
+  // Copiloto de IA Real (Fase 09)
+  const [showAiSettingsModal, setShowAiSettingsModal] = useState(false);
+  const [aiPanelOpen, setAiPanelOpen] = useState(false);
+  const [aiGenerating, setAiGenerating] = useState(false);
+  const [aiSuggestion, setAiSuggestion] = useState(null); // { text, mode, model }
+  const [aiError, setAiError] = useState(null);
+  const [aiCopied, setAiCopied] = useState(false);
+
+  // Formulário do Modal de Configuração de IA
+  const [aiForm, setAiForm] = useState({
+    provider: 'gemini',
+    apiKey: '',
+    model: 'gemini-1.5-flash',
+    systemPrompt: '',
+    temperature: 0.7,
+    enabled: false
+  });
+  const [showApiKeyText, setShowApiKeyText] = useState(false);
+  const [testingAiKey, setTestingAiKey] = useState(false);
+  const [testAiResult, setTestAiResult] = useState(null);
+  const [savingAiConfig, setSavingAiConfig] = useState(false);
+  const [aiSavedSuccess, setAiSavedSuccess] = useState(false);
+
+  useEffect(() => {
+    if (aiConfig) {
+      setAiForm(prev => ({
+        ...prev,
+        provider: aiConfig.provider || 'gemini',
+        model: aiConfig.model || (aiConfig.provider === 'openai' ? 'gpt-4o-mini' : 'gemini-1.5-flash'),
+        systemPrompt: aiConfig.systemPrompt || '',
+        temperature: aiConfig.temperature ?? 0.7,
+        enabled: Boolean(aiConfig.enabled)
+      }));
+    }
+  }, [aiConfig]);
+
+  // Limpa painel de IA ao trocar de chat
+  useEffect(() => {
+    setAiSuggestion(null);
+    setAiError(null);
+    setAiPanelOpen(false);
+  }, [activeChat?.id]);
+
+  const handleTriggerCopilot = async (mode) => {
+    if (!activeChat) return;
+    setAiPanelOpen(true);
+    setAiGenerating(true);
+    setAiError(null);
+    setAiSuggestion(null);
+
+    const res = await requestAiSuggestion({
+      chatId: activeChat.id,
+      mode,
+      draftText: mode === 'improve' ? messageInput : ''
+    });
+
+    setAiGenerating(false);
+    if (res.success) {
+      setAiSuggestion({
+        text: res.suggestion,
+        mode: res.mode,
+        model: res.model
+      });
+    } else {
+      setAiError(res.error || 'Erro ao gerar sugestão de IA.');
+    }
+  };
+
+  const handleApplyAiSuggestion = () => {
+    if (!aiSuggestion?.text) return;
+    setMessageInput(aiSuggestion.text);
+    setAiPanelOpen(false);
+  };
+
+  const handleCopyAiSuggestion = () => {
+    if (!aiSuggestion?.text) return;
+    navigator.clipboard.writeText(aiSuggestion.text);
+    setAiCopied(true);
+    setTimeout(() => setAiCopied(false), 2000);
+  };
+
+  const handleSaveAiConfig = async (e) => {
+    if (e) e.preventDefault();
+    setSavingAiConfig(true);
+    setTestAiResult(null);
+
+    const payload = {
+      provider: aiForm.provider,
+      model: aiForm.model,
+      systemPrompt: aiForm.systemPrompt,
+      temperature: parseFloat(aiForm.temperature) || 0.7,
+      enabled: aiForm.enabled
+    };
+    if (aiForm.apiKey && aiForm.apiKey.trim()) {
+      payload.apiKey = aiForm.apiKey.trim();
+    }
+
+    const res = await updateAiConfig(payload);
+    setSavingAiConfig(false);
+    if (res.success) {
+      setAiSavedSuccess(true);
+      setAiForm(prev => ({ ...prev, apiKey: '' }));
+      setTimeout(() => setAiSavedSuccess(false), 3000);
+    } else {
+      setTestAiResult({ success: false, error: res.error });
+    }
+  };
+
+  const handleTestAiKey = async () => {
+    setTestingAiKey(true);
+    setTestAiResult(null);
+    const res = await testAiConnection({
+      provider: aiForm.provider,
+      apiKey: aiForm.apiKey,
+      model: aiForm.model
+    });
+    setTestingAiKey(false);
+    setTestAiResult(res);
+  };
 
   // Busca interna dentro do chat ativo (Fase 04)
   const [showInChatSearch, setShowInChatSearch] = useState(false);
@@ -970,6 +1097,22 @@ export default function CRMInterface({ onGoToConnect, qrToken }) {
               )}
             </button>
 
+            {/* Copiloto & Configurações de IA (Fase 09) */}
+            <button
+              onClick={() => setShowAiSettingsModal(true)}
+              className={`w-11 h-11 rounded-full flex items-center justify-center transition-all relative ${
+                showAiSettingsModal
+                  ? 'bg-purple-100 text-purple-700'
+                  : 'text-[#54656f] hover:bg-[#eae6df] hover:text-[#111b21]'
+              }`}
+              title="Configurações do Copiloto IA"
+            >
+              <Sparkles size={22} className={aiConfig?.enabled ? "text-purple-600" : ""} />
+              {aiConfig?.enabled && aiConfig?.hasApiKey && (
+                <span className="absolute top-2 right-2 w-2 h-2 rounded-full bg-purple-600" />
+              )}
+            </button>
+
             {/* Arquivados */}
             <button
               onClick={() => {
@@ -1430,6 +1573,21 @@ export default function CRMInterface({ onGoToConnect, qrToken }) {
                     >
                       <Tags size={18} />
                     </button>
+                    {/* Botão Copiloto IA no Header */}
+                    <button
+                      onClick={() => {
+                        setAiPanelOpen(prev => !prev);
+                        if (!aiPanelOpen && !aiSuggestion) {
+                          handleTriggerCopilot('suggest');
+                        }
+                      }}
+                      className={`p-2.5 rounded-full transition-colors ${
+                        aiPanelOpen ? 'bg-purple-100 text-purple-700' : 'hover:bg-[#eae6df] text-purple-600'
+                      }`}
+                      title="Copiloto Comercial de IA"
+                    >
+                      <Sparkles size={18} />
+                    </button>
                     <button
                       onClick={() => setShowInChatSearch(prev => !prev)}
                       className={`p-2.5 rounded-full transition-colors ${
@@ -1708,8 +1866,158 @@ export default function CRMInterface({ onGoToConnect, qrToken }) {
                   <div ref={messagesEndRef} />
                 </div>
 
+                {/* PAINEL DO COPILOTO DE IA (Fase 09) */}
+                {aiPanelOpen && (
+                  <div className="bg-white border-t border-[#e9edef] px-4 py-3 shadow-lg z-20 animate-fade-in">
+                    <div className="max-w-4xl mx-auto space-y-3">
+                      <div className="flex items-center justify-between pb-2 border-b border-[#f0f2f5]">
+                        <div className="flex items-center gap-2">
+                          <div className="w-6 h-6 rounded-lg bg-purple-50 text-purple-600 flex items-center justify-center">
+                            <Sparkles size={14} />
+                          </div>
+                          <span className="text-xs font-bold text-[#111b21]">
+                            Copiloto Comercial IA
+                          </span>
+                          <span className="px-2 py-0.5 rounded-full text-[9px] font-bold bg-purple-100 text-purple-700">
+                            {aiConfig?.provider === 'openai' ? 'OpenAI' : 'Google Gemini'} ({aiConfig?.model || 'gemini-1.5-flash'})
+                          </span>
+                        </div>
+                        <button
+                          onClick={() => setAiPanelOpen(false)}
+                          className="p-1 hover:bg-slate-100 rounded-full text-slate-400 hover:text-slate-600 transition-colors"
+                          title="Fechar Copiloto"
+                        >
+                          <X size={16} />
+                        </button>
+                      </div>
+
+                      {/* Estado: Gerando resposta */}
+                      {aiGenerating && (
+                        <div className="py-6 flex flex-col items-center justify-center gap-3 text-center">
+                          <Loader2 size={24} className="animate-spin text-purple-600" />
+                          <div className="space-y-1">
+                            <p className="text-xs font-semibold text-[#111b21]">
+                              Consultando Inteligência Artificial...
+                            </p>
+                            <p className="text-[11px] text-[#667781]">
+                              Lendo histórico recente do WhatsApp e gerando recomendação de atendimento.
+                            </p>
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Estado: Erro */}
+                      {!aiGenerating && aiError && (
+                        <div className="bg-rose-50 border border-rose-200 rounded-xl p-3 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 text-rose-700">
+                          <div className="flex items-start gap-2">
+                            <AlertCircle size={16} className="shrink-0 mt-0.5" />
+                            <p className="text-xs font-medium leading-relaxed">{aiError}</p>
+                          </div>
+                          <button
+                            onClick={() => setShowAiSettingsModal(true)}
+                            className="px-3 py-1.5 bg-rose-600 hover:bg-rose-700 text-white text-[11px] font-bold rounded-lg shadow-sm shrink-0 transition-colors"
+                          >
+                            Configurar Chave de IA
+                          </button>
+                        </div>
+                      )}
+
+                      {/* Estado: Sugestão Gerada */}
+                      {!aiGenerating && aiSuggestion && (
+                        <div className="space-y-3">
+                          <div className="bg-[#f8f9fa] border border-[#e9edef] rounded-xl p-3 max-h-56 overflow-y-auto">
+                            <p className="text-xs text-[#111b21] whitespace-pre-wrap leading-relaxed">
+                              {aiSuggestion.text}
+                            </p>
+                          </div>
+
+                          <div className="flex flex-wrap items-center justify-between gap-2 pt-1">
+                            <div className="flex items-center gap-2">
+                              <button
+                                onClick={handleApplyAiSuggestion}
+                                className="flex items-center gap-1.5 px-3 py-1.5 bg-[#00a884] hover:bg-[#008f6f] text-white text-xs font-bold rounded-lg shadow-sm transition-all"
+                                title="Inserir no campo de envio"
+                              >
+                                <SendHorizontal size={14} />
+                                <span>Inserir no Chat</span>
+                              </button>
+                              <button
+                                onClick={handleCopyAiSuggestion}
+                                className="flex items-center gap-1.5 px-3 py-1.5 bg-white border border-[#d1d7db] hover:bg-[#f0f2f5] text-xs font-semibold text-[#54656f] rounded-lg transition-colors"
+                                title="Copiar texto"
+                              >
+                                {aiCopied ? (
+                                  <>
+                                    <CheckCheck size={14} className="text-emerald-600" />
+                                    <span className="text-emerald-700 font-bold">Copiado!</span>
+                                  </>
+                                ) : (
+                                  <>
+                                    <Copy size={14} />
+                                    <span>Copiar</span>
+                                  </>
+                                )}
+                              </button>
+                            </div>
+
+                            <button
+                              onClick={() => handleTriggerCopilot(aiSuggestion.mode || 'suggest')}
+                              className="flex items-center gap-1 px-2.5 py-1.5 text-xs text-[#54656f] hover:text-[#111b21] hover:bg-[#f0f2f5] rounded-lg transition-colors"
+                              title="Gerar nova sugestão"
+                            >
+                              <RefreshCw size={13} />
+                              <span>Regenerar</span>
+                            </button>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
+
+                {/* Barra de Ações Rápidas do Copiloto IA (Fase 09) */}
+                <div className="bg-[#f0f2f5] px-4 pt-1.5 pb-0 flex items-center justify-between text-[11px] border-t border-[#e9edef] select-none">
+                  <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar py-0.5">
+                    <span className="text-purple-700 font-bold flex items-center gap-1 shrink-0">
+                      <Sparkles size={12} className="text-purple-600" />
+                      Copiloto:
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => handleTriggerCopilot('suggest')}
+                      className="px-2.5 py-1 rounded-full bg-white hover:bg-purple-50 text-slate-700 hover:text-purple-700 border border-[#d1d7db] hover:border-purple-300 font-semibold text-[10px] shrink-0 transition-colors shadow-2xs"
+                    >
+                      Sugerir Resposta
+                    </button>
+                    <button
+                      type="button"
+                      disabled={!messageInput.trim()}
+                      onClick={() => handleTriggerCopilot('improve')}
+                      className="px-2.5 py-1 rounded-full bg-white hover:bg-purple-50 text-slate-700 hover:text-purple-700 border border-[#d1d7db] hover:border-purple-300 font-semibold text-[10px] shrink-0 transition-colors shadow-2xs disabled:opacity-40 disabled:hover:bg-white disabled:hover:text-slate-700 disabled:hover:border-[#d1d7db]"
+                    >
+                      Melhorar Rascunho
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleTriggerCopilot('summarize')}
+                      className="px-2.5 py-1 rounded-full bg-white hover:bg-purple-50 text-slate-700 hover:text-purple-700 border border-[#d1d7db] hover:border-purple-300 font-semibold text-[10px] shrink-0 transition-colors shadow-2xs"
+                    >
+                      Resumir Conversa
+                    </button>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={() => setShowAiSettingsModal(true)}
+                    className="p-1 text-slate-400 hover:text-purple-600 rounded-md hover:bg-white transition-colors shrink-0 ml-2"
+                    title="Configurações de IA"
+                  >
+                    <Sliders size={13} />
+                  </button>
+                </div>
+
                 {/* Input Bar */}
-                <div className="h-[60px] bg-[#f0f2f5] px-4 flex flex-col justify-center shrink-0 z-10 border-t border-[#e9edef]">
+                <div className="h-[60px] bg-[#f0f2f5] px-4 flex flex-col justify-center shrink-0 z-10">
                   <form onSubmit={handleSendMessage} className="flex items-center gap-3">
                     <div className="flex items-center text-[#54656f] gap-1 shrink-0">
                       <button type="button" className="p-2 hover:bg-[#eae6df] rounded-full">
@@ -2872,6 +3180,294 @@ export default function CRMInterface({ onGoToConnect, qrToken }) {
               </div>
             </div>
 
+          </div>
+        </div>
+      )}
+
+      {/* MODAL: CONFIGURAÇÃO DE INTELIGÊNCIA ARTIFICIAL (Fase 09) */}
+      {showAiSettingsModal && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-white border border-[#e9edef] rounded-2xl w-full max-w-xl max-h-[90vh] overflow-hidden flex flex-col shadow-2xl animate-fade-in text-[#111b21]">
+            
+            {/* Header */}
+            <div className="bg-[#f0f2f5] p-5 flex items-center justify-between border-b border-[#e9edef] shrink-0">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-purple-100 text-purple-700 flex items-center justify-center font-bold">
+                  <Sparkles size={20} />
+                </div>
+                <div>
+                  <h3 className="text-sm font-bold text-[#111b21]">Configurações do Copiloto IA</h3>
+                  <p className="text-[11px] text-[#667781]">
+                    Integração real via API oficial (Google Gemini ou OpenAI)
+                  </p>
+                </div>
+              </div>
+              <button 
+                onClick={() => {
+                  setShowAiSettingsModal(false);
+                  setTestAiResult(null);
+                }}
+                className="p-1.5 hover:bg-slate-200 rounded-full text-slate-500 hover:text-black transition-colors"
+                title="Fechar"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            {/* Form Body */}
+            <form onSubmit={handleSaveAiConfig} className="p-6 overflow-y-auto flex-1 space-y-5 bg-white">
+              
+              {/* Feedback Alerts */}
+              {aiSavedSuccess && (
+                <div className="p-3 bg-emerald-50 border border-emerald-200 text-emerald-800 rounded-xl text-xs font-semibold flex items-center gap-2 animate-fade-in">
+                  <CheckCheck size={16} className="text-emerald-600 shrink-0" />
+                  <span>Configurações do Copiloto salvas com sucesso no banco de dados!</span>
+                </div>
+              )}
+
+              {testAiResult && (
+                <div className={`p-3 rounded-xl text-xs font-medium border flex items-start gap-2 animate-fade-in ${
+                  testAiResult.success
+                    ? 'bg-emerald-50 border-emerald-200 text-emerald-800'
+                    : 'bg-rose-50 border-rose-200 text-rose-800'
+                }`}>
+                  {testAiResult.success ? (
+                    <CheckCheck size={16} className="text-emerald-600 shrink-0 mt-0.5" />
+                  ) : (
+                    <AlertCircle size={16} className="text-rose-600 shrink-0 mt-0.5" />
+                  )}
+                  <div className="space-y-1">
+                    <p className="font-bold">
+                      {testAiResult.success ? 'Conexão validada com sucesso!' : 'Falha no teste de conexão:'}
+                    </p>
+                    <p className="text-[11px]">
+                      {testAiResult.success ? (testAiResult.message || 'API respondeu corretamente.') : testAiResult.error}
+                    </p>
+                  </div>
+                </div>
+              )}
+
+              {/* Ativação Geral */}
+              <div className="flex items-center justify-between p-4 bg-[#f8f9fa] rounded-xl border border-[#e9edef]">
+                <div>
+                  <h4 className="text-xs font-bold text-[#111b21]">Habilitar Copiloto no Chat</h4>
+                  <p className="text-[11px] text-[#667781]">
+                    Permite que atendentes consultem sugestões de resposta e melhorias de texto
+                  </p>
+                </div>
+                <label className="relative inline-flex items-center cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={aiForm.enabled}
+                    onChange={(e) => setAiForm(prev => ({ ...prev, enabled: e.target.checked }))}
+                    className="sr-only peer"
+                  />
+                  <div className="w-11 h-6 bg-slate-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-purple-600"></div>
+                </label>
+              </div>
+
+              {/* Provedor de IA */}
+              <div className="space-y-1.5">
+                <label className="text-xs font-bold text-[#111b21]">Provedor de IA</label>
+                <div className="grid grid-cols-2 gap-3">
+                  <button
+                    type="button"
+                    onClick={() => setAiForm(prev => ({
+                      ...prev,
+                      provider: 'gemini',
+                      model: 'gemini-1.5-flash'
+                    }))}
+                    className={`p-3 rounded-xl border text-left transition-all ${
+                      aiForm.provider === 'gemini'
+                        ? 'border-purple-600 bg-purple-50/50 ring-1 ring-purple-600'
+                        : 'border-[#d1d7db] hover:border-slate-400 bg-white'
+                    }`}
+                  >
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-bold text-[#111b21]">Google Gemini</span>
+                      <span className="text-[9px] px-1.5 py-0.5 rounded font-bold bg-emerald-100 text-emerald-800">
+                        Recomendado
+                      </span>
+                    </div>
+                    <p className="text-[10px] text-[#667781] mt-1">
+                      Altíssima velocidade, chave gratuita no AI Studio e excelente em português.
+                    </p>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setAiForm(prev => ({
+                      ...prev,
+                      provider: 'openai',
+                      model: 'gpt-4o-mini'
+                    }))}
+                    className={`p-3 rounded-xl border text-left transition-all ${
+                      aiForm.provider === 'openai'
+                        ? 'border-purple-600 bg-purple-50/50 ring-1 ring-purple-600'
+                        : 'border-[#d1d7db] hover:border-slate-400 bg-white'
+                    }`}
+                  >
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-bold text-[#111b21]">OpenAI</span>
+                      <span className="text-[9px] px-1.5 py-0.5 rounded font-bold bg-slate-100 text-slate-700">
+                        GPT-4o
+                      </span>
+                    </div>
+                    <p className="text-[10px] text-[#667781] mt-1">
+                      Modelos consagrados GPT-4o e GPT-4o-mini via API oficial OpenAI.
+                    </p>
+                  </button>
+                </div>
+              </div>
+
+              {/* Chave de API */}
+              <div className="space-y-1.5">
+                <div className="flex items-center justify-between">
+                  <label className="text-xs font-bold text-[#111b21]">Chave de API (`API Key`)</label>
+                  {aiConfig?.hasApiKey && (
+                    <span className="text-[10px] text-emerald-600 font-bold flex items-center gap-1">
+                      <Check size={12} /> Chave salva: {aiConfig.maskedKey}
+                    </span>
+                  )}
+                </div>
+                <div className="relative">
+                  <input
+                    type={showApiKeyText ? 'text' : 'password'}
+                    value={aiForm.apiKey}
+                    onChange={(e) => setAiForm(prev => ({ ...prev, apiKey: e.target.value }))}
+                    placeholder={
+                      aiConfig?.hasApiKey
+                        ? "Chave salva ativa. Deixe em branco ou digite uma nova para alterar."
+                        : aiForm.provider === 'openai'
+                        ? "Cole sua chave da OpenAI (sk-...)"
+                        : "Cole sua chave do Google Gemini (AIzaSy...)"
+                    }
+                    className="w-full text-xs p-3 pr-10 rounded-xl border border-[#d1d7db] focus:border-purple-600 focus:ring-1 focus:ring-purple-600 outline-none text-[#111b21]"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowApiKeyText(prev => !prev)}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
+                    title={showApiKeyText ? "Ocultar" : "Exibir"}
+                  >
+                    {showApiKeyText ? <EyeOff size={16} /> : <Eye size={16} />}
+                  </button>
+                </div>
+                <p className="text-[10px] text-[#667781]">
+                  {aiForm.provider === 'openai'
+                    ? "Gere sua chave em platform.openai.com/api-keys"
+                    : "Gere sua chave gratuita em aistudio.google.com/app/apikey"}
+                </p>
+              </div>
+
+              {/* Modelo */}
+              <div className="space-y-1.5">
+                <label className="text-xs font-bold text-[#111b21]">Modelo LLM</label>
+                <select
+                  value={aiForm.model}
+                  onChange={(e) => setAiForm(prev => ({ ...prev, model: e.target.value }))}
+                  className="w-full text-xs p-2.5 rounded-xl border border-[#d1d7db] bg-white text-[#111b21] font-semibold focus:border-purple-600 outline-none"
+                >
+                  {aiForm.provider === 'gemini' ? (
+                    <>
+                      <option value="gemini-1.5-flash">Gemini 1.5 Flash (Padrão recomendado - Mais rápido)</option>
+                      <option value="gemini-1.5-pro">Gemini 1.5 Pro (Avançado - Alta precisão comercial)</option>
+                      <option value="gemini-2.0-flash">Gemini 2.0 Flash (Nova geração ultrarrápida)</option>
+                    </>
+                  ) : (
+                    <>
+                      <option value="gpt-4o-mini">GPT-4o Mini (Padrão recomendado - Ágil e econômico)</option>
+                      <option value="gpt-4o">GPT-4o (Avançado - Máxima capacidade de raciocínio)</option>
+                    </>
+                  )}
+                </select>
+              </div>
+
+              {/* Instruções do Sistema */}
+              <div className="space-y-1.5">
+                <label className="text-xs font-bold text-[#111b21]">
+                  Instruções do Sistema (Persona Comercial)
+                </label>
+                <textarea
+                  rows={3}
+                  value={aiForm.systemPrompt}
+                  onChange={(e) => setAiForm(prev => ({ ...prev, systemPrompt: e.target.value }))}
+                  placeholder="Você é o Copiloto Comercial da Shineray..."
+                  className="w-full text-xs p-3 rounded-xl border border-[#d1d7db] focus:border-purple-600 focus:ring-1 focus:ring-purple-600 outline-none text-[#111b21] resize-none"
+                />
+              </div>
+
+              {/* Temperatura */}
+              <div className="space-y-1.5">
+                <div className="flex justify-between items-center text-xs">
+                  <label className="font-bold text-[#111b21]">Temperatura / Criatividade</label>
+                  <span className="font-semibold text-purple-700">{aiForm.temperature}</span>
+                </div>
+                <input
+                  type="range"
+                  min="0.1"
+                  max="1.0"
+                  step="0.1"
+                  value={aiForm.temperature}
+                  onChange={(e) => setAiForm(prev => ({ ...prev, temperature: parseFloat(e.target.value) }))}
+                  className="w-full accent-purple-600 cursor-pointer"
+                />
+                <div className="flex justify-between text-[9px] text-[#667781]">
+                  <span>0.1 (Mais preciso/direto)</span>
+                  <span>1.0 (Mais criativo)</span>
+                </div>
+              </div>
+
+              {/* Footer Buttons */}
+              <div className="pt-4 border-t border-[#f0f2f5] flex flex-col sm:flex-row items-center justify-between gap-3">
+                <button
+                  type="button"
+                  onClick={handleTestAiKey}
+                  disabled={testingAiKey || (!aiForm.apiKey && !aiConfig?.hasApiKey)}
+                  className="w-full sm:w-auto flex items-center justify-center gap-1.5 px-3.5 py-2 rounded-xl border border-[#d1d7db] hover:bg-[#f0f2f5] text-xs font-semibold text-[#54656f] transition-colors disabled:opacity-40"
+                >
+                  {testingAiKey ? (
+                    <>
+                      <Loader2 size={14} className="animate-spin text-purple-600" />
+                      <span>Testando Conexão...</span>
+                    </>
+                  ) : (
+                    <>
+                      <Play size={13} className="text-purple-600" />
+                      <span>Testar Conexão</span>
+                    </>
+                  )}
+                </button>
+
+                <div className="flex items-center gap-2 w-full sm:w-auto justify-end">
+                  <button
+                    type="button"
+                    onClick={() => setShowAiSettingsModal(false)}
+                    className="px-4 py-2 rounded-xl text-xs font-semibold text-[#54656f] hover:bg-[#f0f2f5] transition-colors"
+                  >
+                    Cancelar
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={savingAiConfig}
+                    className="flex items-center gap-2 px-5 py-2 bg-purple-600 hover:bg-purple-700 text-white text-xs font-bold rounded-xl shadow-sm transition-all disabled:opacity-50"
+                  >
+                    {savingAiConfig ? (
+                      <>
+                        <Loader2 size={14} className="animate-spin" />
+                        <span>Salvando...</span>
+                      </>
+                    ) : (
+                      <>
+                        <Save size={14} />
+                        <span>Salvar Configurações</span>
+                      </>
+                    )}
+                  </button>
+                </div>
+              </div>
+
+            </form>
           </div>
         </div>
       )}

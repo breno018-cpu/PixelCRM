@@ -58,6 +58,10 @@ export const CRMProvider = ({ children }) => {
   const [automations, setAutomations] = useState([]);
   const [loadingAutomations, setLoadingAutomations] = useState(false);
 
+  // Copiloto de IA Real (Fase 09)
+  const [aiConfig, setAiConfig] = useState(null);
+  const [loadingAiConfig, setLoadingAiConfig] = useState(false);
+
   // Busca a lista de chats da API
   const fetchChats = useCallback(async () => {
     setLoadingChats(true);
@@ -541,6 +545,84 @@ export const CRMProvider = ({ children }) => {
     fetchAutomations();
   }, [fetchAutomations]);
 
+  // Busca configuração de IA
+  const fetchAiConfig = useCallback(async () => {
+    setLoadingAiConfig(true);
+    try {
+      const response = await authFetch(`${backendUrl}/api/ai/config`);
+      if (response.ok) {
+        const data = await response.json();
+        setAiConfig(data);
+        return data;
+      }
+    } catch (e) {
+      console.error('[CRM] Erro ao buscar configuração de IA:', e);
+    } finally {
+      setLoadingAiConfig(false);
+    }
+  }, [backendUrl]);
+
+  // Atualiza configuração de IA
+  const updateAiConfig = async (dataToUpdate) => {
+    try {
+      const response = await authFetch(`${backendUrl}/api/ai/config`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(dataToUpdate)
+      });
+      if (response.ok) {
+        const updated = await response.json();
+        setAiConfig(updated);
+        return { success: true, config: updated };
+      }
+      const err = await response.json();
+      return { success: false, error: err.error };
+    } catch (e) {
+      return { success: false, error: e.message };
+    }
+  };
+
+  // Testa conexão com IA
+  const testAiConnection = async (dataToTest) => {
+    try {
+      const response = await authFetch(`${backendUrl}/api/ai/test`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(dataToTest)
+      });
+      const data = await response.json();
+      if (response.ok) {
+        return { success: true, message: data.message, response: data.response };
+      }
+      return { success: false, error: data.error };
+    } catch (e) {
+      return { success: false, error: e.message };
+    }
+  };
+
+  // Solicita sugestão do Copiloto IA para o chat
+  const requestAiSuggestion = async ({ chatId, mode, draftText }) => {
+    try {
+      const response = await authFetch(`${backendUrl}/api/ai/suggest`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ chatId, mode, draftText })
+      });
+      const data = await response.json();
+      if (response.ok) {
+        return { success: true, suggestion: data.suggestion, mode: data.mode, model: data.model };
+      }
+      return { success: false, error: data.error };
+    } catch (e) {
+      return { success: false, error: e.message };
+    }
+  };
+
+  // Carrega configuração de IA ao montar
+  useEffect(() => {
+    fetchAiConfig();
+  }, [fetchAiConfig]);
+
   return (
     <CRMContext.Provider value={{
       chats,
@@ -562,6 +644,12 @@ export const CRMProvider = ({ children }) => {
       loadingAutomations,
       fetchAutomations,
       updateAutomation,
+      aiConfig,
+      loadingAiConfig,
+      fetchAiConfig,
+      updateAiConfig,
+      testAiConnection,
+      requestAiSuggestion,
       dashboardStats,
       loadingDashboardStats,
       fetchDashboardStats,

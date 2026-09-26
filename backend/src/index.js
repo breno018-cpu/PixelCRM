@@ -9,6 +9,7 @@ import { initWhatsApp, getConnectionStatus, logoutWhatsApp, sendMessage, getWASo
 import { prisma } from './db.js';
 import { authenticateToken, requireRole, generateToken } from './auth.js';
 import { ensureDefaultAdmin } from './initAdmin.js';
+import { testAiConnection, generateCopilotSuggestion } from './aiService.js';
 
 dotenv.config();
 
@@ -855,6 +856,187 @@ app.delete('/api/automations/:id', authenticateToken, requireRole('ADMIN'), asyn
     });
     return res.json({ success: true });
   } catch (error) {
+    return res.status(500).json({ error: error.message });
+  }
+});
+
+// --- INTEGRAÇÃO REAL DE IA (LLM COPILOT - FASE 09) ---
+
+app.get('/api/ai/config', authenticateToken, async (req, res) => {
+  try {
+    let config = await prisma.aiConfig.findFirst();
+    if (!config) {
+      config = await prisma.aiConfig.create({
+        data: {
+          provider: 'gemini',
+          model: 'gemini-1.5-flash',
+          systemPrompt: 'Você é o Copiloto Comercial de Inteligência Artificial da concessionária Shineray Motos. Ajude o atendente a responder os clientes com clareza, simpatia, foco em vendas e informações precisas sobre motos, financiamento, consórcio e test-ride.',
+          temperature: 0.7,
+          enabled: false
+        }
+      });
+    }
+
+    const hasApiKey = Boolean(config.apiKey && config.apiKey.trim().length > 0);
+    const maskedKey = hasApiKey 
+      ? `${config.apiKey.slice(0, 4)}...${config.apiKey.slice(-4)}`
+      : '';
+
+    return res.json({
+      id: config.id,
+      provider: config.provider,
+      model: config.model,
+      systemPrompt: config.systemPrompt,
+      temperature: config.temperature,
+      enabled: config.enabled,
+      hasApiKey,
+      maskedKey,
+      updatedAt: config.updatedAt
+    });
+  } catch (error) {
+    return res.status(500).json({ error: error.message });
+  }
+});
+
+app.put('/api/ai/config', authenticateToken, requireRole('ADMIN'), async (req, res) => {
+  try {
+    const { provider, apiKey, model, systemPrompt, temperature, enabled } = req.body;
+
+    let config = await prisma.aiConfig.findFirst();
+    const dataToUpdate = {};
+    if (provider !== undefined) dataToUpdate.provider = provider;
+    if (model !== undefined) dataToUpdate.model = model;
+    if (systemPrompt !== undefined) dataToUpdate.systemPrompt = systemPrompt;
+    if (temperature !== undefined) dataToUpdate.temperature = Number(temperature);
+    if (enabled !== undefined) dataToUpdate.enabled = Boolean(enabled);
+
+    if (apiKey !== undefined && apiKey.trim().length > 0) {
+      dataToUpdate.apiKey = apiKey.trim();
+    }
+
+    if (config) {
+      config = await prisma.aiConfig.update({
+        where: { id: config.id },
+        data: dataToUpdate
+      });
+    } else {
+      config = await prisma.aiConfig.create({
+        data: {
+          provider: provider || 'gemini',
+          apiKey: apiKey ? apiKey.trim() : null,
+          model: model || 'gemini-1.5-flash',
+          systemPrompt: systemPrompt || 'Você é o Copiloto Comercial de Inteligência Artificial da concessionária Shineray Motos.',
+          temperature: temperature ? Number(temperature) : 0.7,
+          enabled: enabled !== undefined ? Boolean(enabled) : false
+        }
+      });
+    }
+
+    const hasApiKey = Boolean(config.apiKey && config.apiKey.trim().length > 0);
+    const maskedKey = hasApiKey 
+      ? `${config.apiKey.slice(0, 4)}...${config.apiKey.slice(-4)}`
+      : '';
+
+    return res.json({
+      id: config.id,
+      provider: config.provider,
+      model: config.model,
+      systemPrompt: config.systemPrompt,
+      temperature: config.temperature,
+      enabled: config.enabled,
+      hasApiKey,
+      maskedKey,
+      updatedAt: config.updatedAt
+    });
+  } catch (error) {
+    return res.status(500).json({ error: error.message });
+  }
+});
+
+app.post('/api/ai/test', authenticateToken, requireRole('ADMIN'), async (req, res) => {
+  try {
+    const { provider, apiKey, model } = req.body;
+
+    let keyToUse = apiKey;
+    let providerToUse = provider;
+    let modelToUse = model;
+
+    if (!keyToUse) {
+      const savedConfig = await prisma.aiConfig.findFirst();
+      if (savedConfig && savedConfig.apiKey) {
+        keyToUse = savedConfig.apiKey;
+        if (!providerToUse) providerToUse = savedConfig.provider;
+        if (!modelToUse) modelToUse = savedConfig.model;
+      }
+    }
+
+    if (!keyToUse) {
+      return res.status(400).json({ error: 'Nenhuma chave de API informada ou salva para teste.' });
+    }
+
+    const testResponse = await testAiConnection({
+      provider: providerToUse || 'gemini',
+      apiKey: keyToUse,
+      model: modelToUse
+    });
+
+    return res.json({ success: true, message: 'Conexão com a IA validada com sucesso!', response: testResponse });
+  } catch (error) {
+    return res.status(400).json({ error: error.message });
+  }
+});
+
+app.post('/api/ai/suggest', authenticateToken, async (req, res) => {
+  try {
+    const { chatId, mode, draftText } = req.body;
+    if (!chatId) {
+      return res.status(400).json({ error: 'ID da conversa é obrigatório.' });
+    }
+
+    const config = await prisma.aiConfig.findFirst();
+    if (!config || !config.enabled) {
+      return res.status(400).json({
+        error: 'O Copiloto de IA está desativado no momento. Acesse a Central de IA para ativá-lo.'
+      });
+    }
+
+    if (!config.apiKey || !config.apiKey.trim()) {
+      return res.status(400).json({
+        error: 'Chave de API da IA não configurada. Cadastre sua chave nas configurações para usar o Copiloto.'
+      });
+    }
+
+    const chat = await prisma.chat.findUnique({
+      where: { id: chatId },
+      include: {
+        messages: {
+          orderBy: { timestamp: 'desc' },
+          take: 20
+        },
+        store: true,
+        assignedUser: true
+      }
+    });
+
+    if (!chat) {
+      return res.status(404).json({ error: 'Conversa não encontrada.' });
+    }
+
+    const orderedChat = {
+      ...chat,
+      messages: (chat.messages || []).slice().reverse()
+    };
+
+    const suggestionResult = await generateCopilotSuggestion({
+      chat: orderedChat,
+      mode: mode || 'suggest',
+      draftText: draftText || '',
+      config
+    });
+
+    return res.json(suggestionResult);
+  } catch (error) {
+    console.error('[AI] Erro ao gerar sugestão:', error);
     return res.status(500).json({ error: error.message });
   }
 });

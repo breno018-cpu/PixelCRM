@@ -55,6 +55,9 @@ export async function ensureDefaultAdmin() {
     // Inicializa regras padrão de automação se não existirem
     await ensureDefaultAutomations();
 
+    // Inicializa configuração padrão de IA se não existir
+    await ensureDefaultAiConfig();
+
   } catch (error) {
     console.error('[Auth] Erro ao verificar/inicializar administrador e loja padrão:', error);
   }
@@ -98,3 +101,29 @@ export async function ensureDefaultAutomations() {
     console.error('[Automation] Erro ao inicializar regras padrão:', error);
   }
 }
+
+export async function ensureDefaultAiConfig() {
+  try {
+    const existing = await prisma.aiConfig.findFirst();
+    if (!existing) {
+      const envKey = process.env.GEMINI_API_KEY || process.env.OPENAI_API_KEY || null;
+      const provider = process.env.OPENAI_API_KEY ? 'openai' : 'gemini';
+      const model = provider === 'openai' ? 'gpt-4o-mini' : 'gemini-1.5-flash';
+
+      await prisma.aiConfig.create({
+        data: {
+          provider,
+          apiKey: envKey,
+          model,
+          temperature: 0.7,
+          enabled: !!envKey,
+          systemPrompt: 'Você é o Copiloto Comercial de Inteligência Artificial da concessionária Shineray Motos. Ajude o atendente a responder os clientes com clareza, simpatia, foco em vendas e informações precisas sobre motos, financiamento, consórcio e test-ride.'
+        }
+      });
+      console.log('[AI] Configuração padrão de IA inicializada no banco.');
+    }
+  } catch (error) {
+    console.error('[AI] Erro ao inicializar configuração de IA:', error);
+  }
+}
+

@@ -95,3 +95,16 @@ model Automation {
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 }
+
+model AiConfig {
+  id           String   @id @default(uuid())
+  provider     String   @default("gemini") // "gemini" | "openai"
+  apiKey       String?
+  model        String   @default("gemini-1.5-flash")
+  systemPrompt String?  @default("Você é o Copiloto Comercial de Inteligência Artificial da concessionária Shineray Motos. Ajude o atendente a responder os clientes com clareza, simpatia, foco em vendas e informações precisas sobre motos, financiamento, consórcio e test-ride.")
+  temperature  Float    @default(0.7)
+  enabled      Boolean  @default(false)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+}
+
