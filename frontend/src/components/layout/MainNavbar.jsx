@@ -8,6 +8,7 @@ import {
   Archive, Sun, Moon, Building2, HelpCircle, 
   LogOut, ShieldAlert, User
 } from 'lucide-react';
+import { useCRM } from '../../context/CRMContext';
 
 // Logomarca Compacta da PixelLoom / Shineray
 const NavbarLogo = ({ size = 26 }) => (
@@ -43,8 +44,8 @@ export default function MainNavbar({
   hasUnread = false,
   hasActiveAutomations = false,
   hasActiveAi = false,
-  isDarkMode = false,
-  onToggleDarkMode,
+  isDarkMode: propIsDarkMode,
+  onToggleDarkMode: propOnToggleDarkMode,
   currentUser,
   onOpenStoreModal,
   onOpenTutorialModal,
@@ -52,6 +53,15 @@ export default function MainNavbar({
   onOpenDisconnectModal,
   onLogout
 }) {
+  let crmCtx = null;
+  try {
+    crmCtx = useCRM();
+  } catch (e) {
+    // Caso usado isoladamente fora do Provider
+  }
+
+  const isDarkMode = propIsDarkMode !== undefined ? propIsDarkMode : (crmCtx?.isDarkMode ?? false);
+  const onToggleDarkMode = propOnToggleDarkMode || crmCtx?.toggleDarkMode;
   const isAdmin = currentUser?.role === 'ADMIN';
 
   return (

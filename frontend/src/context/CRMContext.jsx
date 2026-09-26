@@ -62,6 +62,34 @@ export const CRMProvider = ({ children }) => {
   const [aiConfig, setAiConfig] = useState(null);
   const [loadingAiConfig, setLoadingAiConfig] = useState(false);
 
+  // Dark Mode com Persistência em localStorage (Etapa 16)
+  const [isDarkMode, setIsDarkMode] = useState(() => {
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem('shineray_theme');
+      if (saved) return saved === 'dark';
+      return window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
+    }
+    return false;
+  });
+
+  useEffect(() => {
+    if (typeof document !== 'undefined') {
+      if (isDarkMode) {
+        document.documentElement.classList.add('dark');
+        document.body.classList.add('dark');
+        localStorage.setItem('shineray_theme', 'dark');
+      } else {
+        document.documentElement.classList.remove('dark');
+        document.body.classList.remove('dark');
+        localStorage.setItem('shineray_theme', 'light');
+      }
+    }
+  }, [isDarkMode]);
+
+  const toggleDarkMode = useCallback(() => {
+    setIsDarkMode(prev => !prev);
+  }, []);
+
   // Busca a lista de chats da API
   const fetchChats = useCallback(async () => {
     setLoadingChats(true);
@@ -674,7 +702,10 @@ export const CRMProvider = ({ children }) => {
       updateCRMInfo,
       archiveChat,
       loadMoreMessages,
-      refreshChats: fetchChats
+      refreshChats: fetchChats,
+      isDarkMode,
+      setIsDarkMode,
+      toggleDarkMode
     }}>
       {children}
     </CRMContext.Provider>

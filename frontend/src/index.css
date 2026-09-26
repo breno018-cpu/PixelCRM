@@ -35,8 +35,10 @@
 
 :root {
   --app-bg: #eae6df;
+  --bg-app: #eae6df;
   --header-bg: #f0f2f5;
   --sidebar-bg: #ffffff;
+  --bg-panel: #ffffff;
   --chat-bg: #efeae2;
   --active-bg: #f0f2f5;
   --hover-bg: #f5f6f6;
@@ -47,6 +49,7 @@
   --text-secondary: #667781;
   --text-muted: #8696a0;
   --border-light: #e9edef;
+  --border-subtle: #e9edef;
   --border-medium: #d1d7db;
   --brand-primary: #00a884;
   --brand-hover: #008f6f;
@@ -55,8 +58,10 @@
 
 .dark {
   --app-bg: #0c1317;
+  --bg-app: #0c1317;
   --header-bg: #202c33;
   --sidebar-bg: #111b21;
+  --bg-panel: #111b21;
   --chat-bg: #0b141a;
   --active-bg: #2a3942;
   --hover-bg: #202c33;
@@ -67,6 +72,7 @@
   --text-secondary: #8696a0;
   --text-muted: #667781;
   --border-light: #222d34;
+  --border-subtle: #222d34;
   --border-medium: #374248;
   --brand-primary: #00a884;
   --brand-hover: #02906f;
