@@ -98,8 +98,7 @@ export default function CRMInterface({ onGoToConnect, qrToken }) {
   
   // Modais e Popups
   const [showTutorialModal, setShowTutorialModal] = useState(false);
-  const [tutorialStep, setTutorialStep] = useState(0); // 0 = Conexão, 1 = Funil, 2 = Copiloto IA, 3 = Progresso Sync, 4 = Multi-Lojas
-  const [showAccessDeniedModal, setShowAccessDeniedModal] = useState(false);
+  const [tutorialStep, setTutorialStep] = useState(0);
   const [selectedImagePreview, setSelectedImagePreview] = useState(null); // Lightbox URL
   const [showQrLinkPopup, setShowQrLinkPopup] = useState(false);
   const [linkCopied, setLinkCopied] = useState(false);
@@ -116,28 +115,6 @@ export default function CRMInterface({ onGoToConnect, qrToken }) {
   // Splash Screen e Carregamento PixelLoom (Ultra-Minimalist Style)
   const [isBooted, setIsBooted] = useState(() => !!localStorage.getItem('crm_token'));
   const [bootProgress, setBootProgress] = useState(() => localStorage.getItem('crm_token') ? 100 : 0);
-
-  // Estados Interativos para Simulações do Tutorial Dinâmico
-  const [simulatedKanbanStage, setSimulatedKanbanStage] = useState('LEAD');
-  const [simulatedMessages, setSimulatedMessages] = useState([
-    { fromMe: false, text: 'Quero financiar a Jet 125, vocês fazem sem entrada?' }
-  ]);
-  const [simulatedAiTyping, setSimulatedAiTyping] = useState(false);
-  const [simulatedSyncPercent, setSimulatedSyncPercent] = useState(0);
-  const [simulatedSyncActive, setSimulatedSyncActive] = useState(false);
-  
-  // Estados interativos para o novo slide de multi-lojas do tutorial
-  const [simulatedStore, setSimulatedStore] = useState('Matriz');
-  const [simulatedStock, setSimulatedStock] = useState(14);
-  const [simulatedReserveActive, setSimulatedReserveActive] = useState(false);
-
-  // Estados Falsos de Automação de IA (Bloqueados para Operador Júnior)
-  const aiTriage = true;
-  const outOfOffice = false;
-  const roundRobin = true;
-  const followUpReminder = true;
-  const aiModel = 'gpt-4o';
-  const aiSystemPrompt = 'Você é o assistente virtual da concessionária Shineray. Seu objetivo é qualificar o interesse do lead nas motos Shineray (Jet 125, Phoenix 50, Rio 125) e obter informações sobre o valor de entrada e cidade do cliente.';
 
   const messagesEndRef = useRef(null);
 
@@ -173,7 +150,6 @@ export default function CRMInterface({ onGoToConnect, qrToken }) {
       setNameInput(activeChat.name || '');
       setNotesInput(activeChat.notes || '');
       setEditingName(false);
-      setSidebarTab('crm'); // Reseta a aba do menu lateral para CRM padrão
     }
   }, [activeChat]);
 
@@ -323,54 +299,6 @@ export default function CRMInterface({ onGoToConnect, qrToken }) {
   const handleFunnelStageChange = (stage) => {
     if (!activeChat) return;
     updateCRMInfo(activeChat.id, { funnelStage: stage });
-  };
-
-  // Interceptação de mudança de aba: bloqueia painel e automações mostrando o modal sem ir para a tela
-  const handleTabChange = (tab) => {
-    if (tab === 'dashboard' || tab === 'automations') {
-      setShowAccessDeniedModal(true);
-      return; // Bloqueia a navegação de aba
-    }
-    setActiveTab(tab);
-  };
-
-  // Funções para simulação interativa do tutorial dinâmico
-  const runSimulatedSync = () => {
-    if (simulatedSyncActive) return;
-    setSimulatedSyncActive(true);
-    setSimulatedSyncPercent(0);
-    const interval = setInterval(() => {
-      setSimulatedSyncPercent(prev => {
-        if (prev >= 100) {
-          clearInterval(interval);
-          setSimulatedSyncActive(false);
-          return 100;
-        }
-        return prev + 5;
-      });
-    }, 150);
-  };
-
-  const selectSimulatedSuggestion = (text) => {
-    if (simulatedAiTyping) return;
-    setSimulatedAiTyping(true);
-    setTimeout(() => {
-      setSimulatedMessages(prev => [
-        ...prev,
-        { fromMe: true, text: text },
-        { fromMe: false, text: 'Gostei da proposta! O que preciso enviar para aprovar?' }
-      ]);
-      setSimulatedAiTyping(false);
-    }, 1200);
-  };
-
-  const runSimulatedReserve = () => {
-    if (simulatedReserveActive || simulatedStock <= 0) return;
-    setSimulatedReserveActive(true);
-    setTimeout(() => {
-      setSimulatedStock(prev => prev - 1);
-      setSimulatedReserveActive(false);
-    }, 1000);
   };
 
   // Helper para rótulo legível do estágio de funil
@@ -612,35 +540,6 @@ export default function CRMInterface({ onGoToConnect, qrToken }) {
             >
               <FolderArchive size={22} />
             </button>
-
-            {/* Quadro Kanban / CRM - BLOQUEADO POR CLIQUE */}
-            <button
-              onClick={() => handleTabChange('dashboard')}
-              className={`w-11 h-11 rounded-full flex items-center justify-center transition-all ${
-                activeTab === 'dashboard'
-                  ? 'bg-[#eae6df] text-[#00a884]'
-                  : 'text-[#54656f] hover:bg-[#eae6df] hover:text-[#111b21]'
-              }`}
-              title="Painel CRM & Kanban (Restrito)"
-            >
-              <BarChart3 size={22} />
-            </button>
-
-            {/* Automações Inteligentes IA - BLOQUEADA POR CLIQUE */}
-            <button
-              onClick={() => handleTabChange('automations')}
-              className={`w-11 h-11 rounded-full flex items-center justify-center transition-all relative ${
-                activeTab === 'automations'
-                  ? 'bg-[#eae6df] text-[#00a884]'
-                  : 'text-[#54656f] hover:bg-[#eae6df] hover:text-[#111b21]'
-              }`}
-              title="Automações IA & Chatbots (Restrito)"
-            >
-              <Bot size={22} />
-              <span className="absolute -top-1 -right-1 bg-[#00a884] text-[7px] font-extrabold text-white px-1 py-0.5 rounded-full border border-white">
-                IA
-              </span>
-            </button>
           </nav>
         </div>
 
@@ -733,13 +632,6 @@ export default function CRMInterface({ onGoToConnect, qrToken }) {
                     <ArrowLeft size={19} />
                   </button>
                 )}
-                <button 
-                  onClick={() => setShowAccessDeniedModal(true)}
-                  className="p-2 hover:bg-[#eae6df] rounded-full" 
-                  title="Mais Opções"
-                >
-                  <MoreVertical size={19} />
-                </button>
               </div>
             </header>
 
@@ -1021,13 +913,6 @@ export default function CRMInterface({ onGoToConnect, qrToken }) {
                     <button className="p-2 hover:bg-[#eae6df] rounded-full" title="Pesquisar">
                       <Search size={18} />
                     </button>
-                    <button 
-                      onClick={() => setShowAccessDeniedModal(true)}
-                      className="p-2 hover:bg-[#eae6df] rounded-full" 
-                      title="Opções"
-                    >
-                      <MoreVertical size={18} />
-                    </button>
                   </div>
                 </header>
 
@@ -1126,40 +1011,35 @@ export default function CRMInterface({ onGoToConnect, qrToken }) {
                                   : 'bg-white border-white text-[#111b21] rounded-tl-none shadow-sm'
                               }`}
                             >
-                              {/* 3 pontinhos na mensagem - não funcional, mostra restrição de cargo */}
-                              <button
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  setShowAccessDeniedModal(true);
-                                }}
-                                className="absolute top-1.5 right-1.5 opacity-0 group-hover:opacity-100 transition-opacity p-0.5 text-slate-400 hover:text-slate-600 rounded"
-                                title="Mais opções da mensagem"
-                              >
-                                <MoreVertical size={12} />
-                              </button>
-                              {!isMe && msg.senderName && (
+                              {isMe ? null : msg.senderName ? (
                                 <span className="block text-[10px] font-bold text-[#0270ca] mb-1">
                                   {msg.senderName}
                                 </span>
-                              )}
+                              ) : null}
                               
                               {msg.type === 'image' ? (
                                 <div className="space-y-1.5 cursor-pointer" onClick={() => {
-                                  const imgUrl = msg.mediaUrl 
-                                    ? (msg.mediaUrl.startsWith('http') ? msg.mediaUrl : `${backendUrl}${msg.mediaUrl}`) 
-                                    : 'https://images.unsplash.com/photo-1558981806-ec527fa84c39?w=800';
-                                  setSelectedImagePreview(imgUrl);
+                                  if (msg.mediaUrl) {
+                                    const imgUrl = msg.mediaUrl.startsWith('http') ? msg.mediaUrl : `${backendUrl}${msg.mediaUrl}`;
+                                    setSelectedImagePreview(imgUrl);
+                                  }
                                 }}>
-                                  <div className="relative rounded-md overflow-hidden border border-[#e9edef] max-w-[285px] bg-[#f0f2f5]">
-                                    <img 
-                                      src={msg.mediaUrl ? (msg.mediaUrl.startsWith('http') ? msg.mediaUrl : `${backendUrl}${msg.mediaUrl}`) : 'https://images.unsplash.com/photo-1558981806-ec527fa84c39?w=500'} 
-                                      alt="Imagem" 
-                                      className="w-full h-auto max-h-[190px] object-cover hover:scale-[1.02] transition-transform duration-300"
-                                      onError={(e) => {
-                                        e.target.src = 'https://images.unsplash.com/photo-1558981806-ec527fa84c39?w=500';
-                                      }}
-                                    />
-                                    <div className="absolute inset-0 bg-black/5 hover:bg-black/0 transition-colors" />
+                                  <div className="relative rounded-md overflow-hidden border border-[#e9edef] max-w-[285px] bg-[#f0f2f5] min-h-[100px] flex items-center justify-center">
+                                    {msg.mediaUrl ? (
+                                      <img 
+                                        src={msg.mediaUrl.startsWith('http') ? msg.mediaUrl : `${backendUrl}${msg.mediaUrl}`} 
+                                        alt="Imagem" 
+                                        className="w-full h-auto max-h-[190px] object-cover hover:scale-[1.02] transition-transform duration-300"
+                                        onError={(e) => {
+                                          e.target.style.display = 'none';
+                                        }}
+                                      />
+                                    ) : null}
+                                    <div className="flex flex-col items-center justify-center p-4 text-[#667781] text-xs gap-1.5" style={{ display: msg.mediaUrl ? 'none' : 'flex' }}>
+                                      <AlertCircle size={18} className="text-amber-500" />
+                                      <span className="text-[10px]">Imagem não disponível ou expirada</span>
+                                    </div>
+                                    <div className="absolute inset-0 bg-black/5 hover:bg-black/0 transition-colors pointer-events-none" />
                                   </div>
                                   {msg.text && <p className="whitespace-pre-wrap leading-relaxed break-words mt-1">{msg.text}</p>}
                                 </div>
@@ -1292,237 +1172,127 @@ export default function CRMInterface({ onGoToConnect, qrToken }) {
                 </button>
               </div>
 
-              <div className="flex bg-[#f0f2f5] border-b border-[#e9edef] text-[10px] font-extrabold uppercase shrink-0">
-                <button
-                  onClick={() => setSidebarTab('crm')}
-                  className={`flex-1 py-3 text-center border-b-2 transition-all ${
-                    sidebarTab === 'crm' 
-                      ? 'border-[#00a884] text-[#00a884]' 
-                      : 'border-transparent text-[#667781] hover:text-[#111b21]'
-                  }`}
-                >
-                  Ficha do Lead
-                </button>
-                <button
-                  onClick={() => setSidebarTab('ai_copilot')}
-                  className={`flex-1 py-3 text-center border-b-2 transition-all flex items-center justify-center gap-1.5 ${
-                    sidebarTab === 'ai_copilot' 
-                      ? 'border-[#00a884] text-[#00a884]' 
-                      : 'border-transparent text-[#667781] hover:text-[#111b21]'
-                  }`}
-                >
-                  <Sparkles size={13} />
-                  Copiloto IA
-                </button>
-              </div>
-
               <div className="flex-1 overflow-y-auto p-5 space-y-6">
-                
-                {sidebarTab === 'crm' ? (
-                  <>
-                    <div className="flex flex-col items-center text-center pb-5 border-b border-[#e9edef]">
-                      {activeChat.avatarUrl ? (
-                        <img 
-                          src={activeChat.avatarUrl} 
-                          alt={activeChat.name || activeChat.phone} 
-                          className="w-20 h-20 rounded-full object-cover shrink-0 select-none border border-[#e9edef] shadow-sm mb-3" 
-                          referrerPolicy="no-referrer"
-                        />
-                      ) : (
-                        <div className="w-20 h-20 rounded-full bg-slate-200 flex items-center justify-center text-slate-500 text-2xl font-bold border border-slate-300 shadow-sm mb-3 select-none">
-                          {activeChat.name ? activeChat.name.charAt(0).toUpperCase() : <User size={28} />}
-                        </div>
-                      )}
-                      <h3 className="text-sm font-bold text-[#111b21]">{activeChat.name || activeChat.phone}</h3>
-                      <p className="text-[11px] text-[#667781] mt-1 font-medium">{activeChat.phone}</p>
+                <div className="flex flex-col items-center text-center pb-5 border-b border-[#e9edef]">
+                  {activeChat.avatarUrl ? (
+                    <img 
+                      src={activeChat.avatarUrl} 
+                      alt={activeChat.name || activeChat.phone} 
+                      className="w-20 h-20 rounded-full object-cover shrink-0 select-none border border-[#e9edef] shadow-sm mb-3" 
+                      referrerPolicy="no-referrer"
+                    />
+                  ) : (
+                    <div className="w-20 h-20 rounded-full bg-slate-200 flex items-center justify-center text-slate-500 text-2xl font-bold border border-slate-300 shadow-sm mb-3 select-none">
+                      {activeChat.name ? activeChat.name.charAt(0).toUpperCase() : <User size={28} />}
                     </div>
+                  )}
+                  <h3 className="text-sm font-bold text-[#111b21]">{activeChat.name || activeChat.phone}</h3>
+                  <p className="text-[11px] text-[#667781] mt-1 font-medium">{activeChat.phone}</p>
+                </div>
 
-                    <div className="space-y-3">
-                      <label className="text-[9px] font-bold text-slate-500 tracking-widest uppercase flex items-center gap-2">
-                        <Award size={14} className="text-[#00a884]" />
-                        Estágio Comercial do Lead
-                      </label>
-                      
-                      <div className="space-y-1.5">
-                        {['LEAD', 'NEGOTIATION', 'PROPOSAL', 'CLOSED'].map((stage) => {
-                          const isSelected = activeChat.funnelStage === stage;
-                          return (
-                            <button
-                              key={stage}
-                              onClick={() => handleFunnelStageChange(stage)}
-                              className={`w-full py-2 px-3 rounded-lg border text-left text-xs font-semibold transition-all flex items-center justify-between ${
-                                isSelected
-                                  ? 'bg-[#00a884]/10 border-[#00a884]/40 text-[#00a884] shadow-sm'
-                                  : 'bg-[#f0f2f5] border-transparent text-[#667781] hover:text-[#111b21] hover:bg-[#eae6df]'
-                              }`}
-                            >
-                              <span>{getStageLabel(stage)}</span>
-                              {isSelected && <Check size={13} />}
-                            </button>
-                          );
-                        })}
-                      </div>
-                    </div>
-
-                    <div className="space-y-3">
-                      <label className="text-[9px] font-bold text-slate-500 tracking-widest uppercase flex items-center gap-2">
-                        <Tags size={14} className="text-[#00a884]" />
-                        Tags e Classificadores
-                      </label>
-                      
-                      <div className="flex flex-wrap gap-1.5 min-h-[36px] p-2 bg-[#f0f2f5]/40 border border-[#e9edef] rounded-lg">
-                        {activeChat.tags ? (
-                          activeChat.tags.split(',').filter(Boolean).map((t, idx) => (
-                            <span
-                              key={idx}
-                              className="bg-white border border-[#e9edef] text-[#667781] text-[9px] px-2 py-0.5 rounded flex items-center gap-1.5 group font-bold uppercase shadow-sm"
-                            >
-                              {t}
-                              <button
-                                onClick={() => handleRemoveTag(t)}
-                                className="text-slate-400 hover:text-rose-500 transition-colors"
-                              >
-                                <X size={10} />
-                              </button>
-                            </span>
-                          ))
-                        ) : (
-                          <span className="text-[10px] text-slate-400 italic select-none">Nenhuma tag criada</span>
-                        )}
-                      </div>
-
-                      <form onSubmit={handleAddTag} className="flex gap-2">
-                        <input
-                          type="text"
-                          placeholder="Criar tag..."
-                          value={tagInput}
-                          onChange={(e) => setTagInput(e.target.value)}
-                          className="flex-1 bg-white border border-[#e9edef] rounded-lg px-2.5 py-1.5 text-xs text-[#111b21] focus:outline-none focus:ring-1 focus:ring-[#00a884]/40 placeholder-[#667781]"
-                        />
+                <div className="space-y-3">
+                  <label className="text-[9px] font-bold text-slate-500 tracking-widest uppercase flex items-center gap-2">
+                    <Award size={14} className="text-[#00a884]" />
+                    Estágio Comercial do Lead
+                  </label>
+                  
+                  <div className="space-y-1.5">
+                    {['LEAD', 'NEGOTIATION', 'PROPOSAL', 'CLOSED'].map((stage) => {
+                      const isSelected = activeChat.funnelStage === stage;
+                      return (
                         <button
-                          type="submit"
-                          className="px-3.5 bg-[#00a884] hover:bg-emerald-500 text-white font-bold rounded-lg flex items-center justify-center active:scale-95 transition-all shadow-sm border border-transparent"
+                          key={stage}
+                          onClick={() => handleFunnelStageChange(stage)}
+                          className={`w-full py-2 px-3 rounded-lg border text-left text-xs font-semibold transition-all flex items-center justify-between ${
+                            isSelected
+                              ? 'bg-[#00a884]/10 border-[#00a884]/40 text-[#00a884] shadow-sm'
+                              : 'bg-[#f0f2f5] border-transparent text-[#667781] hover:text-[#111b21] hover:bg-[#eae6df]'
+                          }`}
                         >
-                          <Plus size={15} />
+                          <span>{getStageLabel(stage)}</span>
+                          {isSelected && <Check size={13} />}
                         </button>
-                      </form>
-                    </div>
-
-                    <div className="space-y-3 flex-1 flex flex-col">
-                      <div className="flex items-center justify-between">
-                        <label className="text-[9px] font-bold text-slate-500 tracking-widest uppercase flex items-center gap-2">
-                          <FileText size={14} className="text-[#00a884]" />
-                          Histórico / Anotações
-                        </label>
-                        {notesSavedAlert && (
-                          <span className="text-[9px] text-[#00a884] font-bold animate-pulse">Salvo!</span>
-                        )}
-                      </div>
-
-                      <textarea
-                        placeholder="Adicione anotações sobre este cliente..."
-                        value={notesInput}
-                        onChange={(e) => setNotesInput(e.target.value)}
-                        rows={5}
-                        className="w-full flex-1 bg-white border border-[#e9edef] rounded-lg p-3 text-xs text-[#111b21] focus:outline-none focus:ring-1 focus:ring-[#00a884]/40 placeholder-[#667781] resize-none min-h-[120px]"
-                      />
-
-                      <button
-                        onClick={handleSaveNotes}
-                        disabled={isSavingNotes}
-                        className="w-full py-2.5 bg-[#00a884] hover:bg-emerald-500 disabled:bg-[#00a884]/40 text-white font-bold text-xs rounded-lg flex items-center justify-center gap-1.5 active:scale-95 transition-all shadow-md border border-transparent"
-                      >
-                        {isSavingNotes ? (
-                          <Loader2 size={12} className="animate-spin" />
-                        ) : (
-                          <Save size={12} />
-                        )}
-                        Salvar Anotações
-                      </button>
-                    </div>
-                  </>
-                ) : (
-                  /* ABA 2: COPILOTO IA */
-                  <div className="space-y-6">
-                    <div className="bg-[#f0f2f5] border border-[#e9edef] p-3.5 rounded-lg space-y-2">
-                      <h4 className="text-[10px] font-bold tracking-wider text-violet-600 uppercase flex items-center gap-1.5">
-                        <Sparkles size={12} />
-                        Análise de Perfil (Anie IA)
-                      </h4>
-                      <div className="space-y-1.5 text-xs text-[#3b4a54]">
-                        <p><strong className="text-[#667781]">Intenção:</strong> Comprar à vista ou financiar Shineray Jet 125 SS</p>
-                        <p className="flex items-center gap-1.5">
-                          <strong className="text-[#667781]">Humor do Lead:</strong> 
-                          <span className="flex items-center gap-1 text-[#00a884] font-bold">
-                            <span className="w-2 h-2 bg-[#00a884] rounded-full animate-pulse" />
-                            Altamente Interessado
-                          </span>
-                        </p>
-                        <p><strong className="text-[#667781]">Próxima Ação:</strong> Solicitar ficha cadastral para simulação bancária</p>
-                      </div>
-                    </div>
-
-                    {/* [NOVO] PAINEL DA ANIE IA NO CLIENTE (Não-funcional - erro de cargo) */}
-                    <div className="bg-white border border-[#e9edef] p-3.5 rounded-lg space-y-3 shadow-sm">
-                      <h4 className="text-[10px] font-extrabold tracking-wider text-[#00a884] uppercase flex items-center gap-1.5 border-b border-[#e9edef] pb-2">
-                        <Sparkles size={13} />
-                        Anie IA - Respostas Automáticas
-                      </h4>
-                      <p className="text-[10.5px] text-[#667781] leading-relaxed">
-                        A IA <strong>Anie</strong> está ativa respondendo novos leads de motos Shineray. Para ajustar as regras de comportamento da Anie, envie um comando de WhatsApp ou edite abaixo:
-                      </p>
-                      
-                      <div className="space-y-2">
-                        <label className="text-[8.5px] font-bold text-slate-400 uppercase tracking-widest block">Instrução para Anie</label>
-                        <textarea
-                          placeholder="Ex: Oferecer desconto de R$ 300 na Jet 125 apenas para pagamento via PIX..."
-                          onClick={() => setShowAccessDeniedModal(true)}
-                          readOnly
-                          rows={2}
-                          className="w-full bg-[#f0f2f5] border border-[#e9edef] rounded-lg p-2 text-xs text-slate-500 cursor-pointer placeholder-slate-400 focus:outline-none"
-                        />
-                      </div>
-
-                      <button
-                        onClick={() => setShowAccessDeniedModal(true)}
-                        className="w-full py-2 bg-gradient-to-r from-emerald-500 to-[#00a884] text-white font-bold text-[9.5px] rounded-lg shadow-sm hover:from-emerald-600 active:scale-95 transition-all flex items-center justify-center gap-1 border border-transparent"
-                      >
-                        <MessageCircle size={12} />
-                        Solicitar Modificação da Anie via WhatsApp
-                      </button>
-                    </div>
-
-                    <div className="space-y-3">
-                      <label className="text-[9px] font-bold text-slate-500 tracking-widest uppercase flex items-center gap-2">
-                        <Bot size={14} className="text-[#00a884]" />
-                        Sugestões de Resposta IA (Anie)
-                      </label>
-                      <p className="text-[10px] text-slate-400 italic">
-                        Clique em uma sugestão abaixo para utilizá-la:
-                      </p>
-                      
-                      <div className="space-y-2">
-                        {[
-                          "Olá! Para a Shineray Jet 125, conseguimos aprovar com entrada mínima de R$ 1.500. Vamos fazer a simulação das parcelas?",
-                          "Olá! O modelo Shineray Phoenix 50cc está disponível a pronta entrega em nossas cores cinza e preto. Quer vir conhecer na loja?",
-                          "Perfeito! Vou encaminhar agora a lista de documentos necessários para a análise de crédito da sua moto zero. Tudo bem?"
-                        ].map((sugestion, idx) => (
-                          <button
-                            key={idx}
-                            onClick={() => {
-                              setShowAccessDeniedModal(true);
-                            }}
-                            className="w-full text-left p-3 rounded-lg bg-white border border-[#e9edef] hover:border-violet-400 text-xs text-slate-700 hover:text-slate-900 transition-all text-ellipsis overflow-hidden shadow-sm"
-                          >
-                            <span className="block text-[8px] font-extrabold text-[#00a884] mb-1">SUGESTÃO {idx + 1}</span>
-                            "{sugestion}"
-                          </button>
-                        ))}
-                      </div>
-                    </div>
+                      );
+                    })}
                   </div>
-                )}
+                </div>
 
+                <div className="space-y-3">
+                  <label className="text-[9px] font-bold text-slate-500 tracking-widest uppercase flex items-center gap-2">
+                    <Tags size={14} className="text-[#00a884]" />
+                    Tags e Classificadores
+                  </label>
+                  
+                  <div className="flex flex-wrap gap-1.5 min-h-[36px] p-2 bg-[#f0f2f5]/40 border border-[#e9edef] rounded-lg">
+                    {activeChat.tags ? (
+                      activeChat.tags.split(',').filter(Boolean).map((t, idx) => (
+                        <span
+                          key={idx}
+                          className="bg-white border border-[#e9edef] text-[#667781] text-[9px] px-2 py-0.5 rounded flex items-center gap-1.5 group font-bold uppercase shadow-sm"
+                        >
+                          {t}
+                          <button
+                            onClick={() => handleRemoveTag(t)}
+                            className="text-slate-400 hover:text-rose-500 transition-colors"
+                          >
+                            <X size={10} />
+                          </button>
+                        </span>
+                      ))
+                    ) : (
+                      <span className="text-[10px] text-slate-400 italic select-none">Nenhuma tag criada</span>
+                    )}
+                  </div>
+
+                  <form onSubmit={handleAddTag} className="flex gap-2">
+                    <input
+                      type="text"
+                      placeholder="Criar tag..."
+                      value={tagInput}
+                      onChange={(e) => setTagInput(e.target.value)}
+                      className="flex-1 bg-white border border-[#e9edef] rounded-lg px-2.5 py-1.5 text-xs text-[#111b21] focus:outline-none focus:ring-1 focus:ring-[#00a884]/40 placeholder-[#667781]"
+                    />
+                    <button
+                      type="submit"
+                      className="px-3.5 bg-[#00a884] hover:bg-emerald-500 text-white font-bold rounded-lg flex items-center justify-center active:scale-95 transition-all shadow-sm border border-transparent"
+                    >
+                      <Plus size={15} />
+                    </button>
+                  </form>
+                </div>
+
+                <div className="space-y-3 flex-1 flex flex-col">
+                  <div className="flex items-center justify-between">
+                    <label className="text-[9px] font-bold text-slate-500 tracking-widest uppercase flex items-center gap-2">
+                      <FileText size={14} className="text-[#00a884]" />
+                      Histórico / Anotações
+                    </label>
+                    {notesSavedAlert && (
+                      <span className="text-[9px] text-[#00a884] font-bold animate-pulse">Salvo!</span>
+                    )}
+                  </div>
+
+                  <textarea
+                    placeholder="Adicione anotações sobre este cliente..."
+                    value={notesInput}
+                    onChange={(e) => setNotesInput(e.target.value)}
+                    rows={5}
+                    className="w-full flex-1 bg-white border border-[#e9edef] rounded-lg p-3 text-xs text-[#111b21] focus:outline-none focus:ring-1 focus:ring-[#00a884]/40 placeholder-[#667781] resize-none min-h-[120px]"
+                  />
+
+                  <button
+                    onClick={handleSaveNotes}
+                    disabled={isSavingNotes}
+                    className="w-full py-2.5 bg-[#00a884] hover:bg-emerald-500 disabled:bg-[#00a884]/40 text-white font-bold text-xs rounded-lg flex items-center justify-center gap-1.5 active:scale-95 transition-all shadow-md border border-transparent"
+                  >
+                    {isSavingNotes ? (
+                      <Loader2 size={12} className="animate-spin" />
+                    ) : (
+                      <Save size={12} />
+                    )}
+                    Salvar Anotações
+                  </button>
+                </div>
               </div>
             </aside>
           )}
@@ -1553,186 +1323,126 @@ export default function CRMInterface({ onGoToConnect, qrToken }) {
             {/* Slider de Passos do Tutorial Dinâmico */}
             <div className="p-6 overflow-y-auto flex-1 flex flex-col justify-between space-y-6 bg-white">
               
-              {/* SLIDE 0: Conexão QR Externa */}
+              {/* SLIDE 0: Conexão WhatsApp */}
               {tutorialStep === 0 && (
                 <div className="space-y-4 animate-fade-in flex-1 flex flex-col">
-                  <div className="relative border border-[#e9edef] bg-[#f8f9fa] rounded-xl p-6 flex flex-col items-center justify-center min-h-[160px] overflow-hidden">
-                    <div className="absolute w-full h-[3px] bg-[#00a884]/30 left-0 top-1/2 animate-scanline pointer-events-none" />
-                    
-                    <div className="flex items-center gap-8 z-10">
-                      <div className="w-20 h-20 bg-white p-1 rounded-lg flex items-center justify-center relative border border-[#e9edef] shadow-sm">
-                        <div className="w-full h-full bg-[#f0f2f5] flex items-center justify-center font-bold text-slate-500 text-[8px]">QR Code</div>
+                  <div className="border border-[#e9edef] bg-[#f8f9fa] rounded-xl p-6 flex flex-col items-center justify-center min-h-[160px]">
+                    <div className="flex items-center gap-6">
+                      <div className="w-16 h-16 rounded-2xl bg-[#00a884]/10 border border-[#00a884]/30 flex items-center justify-center text-[#00a884]">
+                        <MessageSquare size={32} />
                       </div>
-                      <ChevronRight size={20} className="text-[#00a884] animate-pulse" />
-                      <div className="w-16 h-28 border-2 border-slate-300 rounded-xl bg-white flex flex-col justify-between p-2 shadow-sm">
-                        <div className="w-full h-1 bg-slate-200 rounded" />
-                        <div className="w-6 h-6 rounded-full bg-[#00a884]/15 border border-[#00a884]/30 flex items-center justify-center text-[7px] text-[#00a884] mx-auto font-bold">Scan</div>
-                        <div className="w-2 h-2 rounded-full bg-slate-300 mx-auto" />
+                      <ChevronRight size={20} className="text-[#00a884]" />
+                      <div className="w-16 h-16 rounded-2xl bg-white border border-[#e9edef] shadow-sm flex items-center justify-center text-slate-700">
+                        <PixelLoomLogo size={32} />
                       </div>
                     </div>
                   </div>
                   
                   <div className="space-y-2 text-center px-4">
-                    <h4 className="text-sm font-bold text-[#00a884]">Conexão QR Externa & Segura</h4>
+                    <h4 className="text-sm font-bold text-[#00a884]">Conexão Segura com WhatsApp</h4>
                     <p className="text-xs text-[#667781] leading-relaxed">
-                      O celular do atendimento pode ser pareado de forma externa e 100% isolada através da rota dedicada <strong className="text-slate-700">`/conectar`</strong>. Ela exibe apenas o QR Code e bloqueia o acesso à central de leads, mantendo a privacidade de sua operação.
+                      Pareie seu aparelho escaneando o código QR diretamente no CRM ou acesse a rota dedicada <strong className="text-slate-700">/conectar</strong> para realizar o pareamento em outro dispositivo. A conexão é mantida de forma persistente pelo servidor Baileys.
                     </p>
                   </div>
                 </div>
               )}
 
-              {/* SLIDE 1: Funil Comercial Interativo */}
+              {/* SLIDE 1: Funil Comercial */}
               {tutorialStep === 1 && (
                 <div className="space-y-4 animate-fade-in flex-1 flex flex-col">
-                  {/* Simulador Interativo do Funil */}
-                  <div className="border border-[#e9edef] bg-[#f8f9fa] rounded-xl p-5 flex flex-col justify-center space-y-3 min-h-[160px]">
-                    <div className="flex justify-between items-center">
-                      <span className="text-[10px] text-slate-400 font-extrabold uppercase">SIMULADOR CRM</span>
-                      <span className={`px-2 py-0.5 rounded text-[8px] font-extrabold uppercase ${getStageColor(simulatedKanbanStage)}`}>
-                        {getStageLabel(simulatedKanbanStage)}
-                      </span>
-                    </div>
-
-                    <div className="bg-white p-3 rounded-lg border border-[#e9edef] shadow-sm flex justify-between items-center">
-                      <div>
-                        <h5 className="text-[11px] font-bold text-[#111b21]">Lead: Renato Shineray</h5>
-                        <p className="text-[9px] text-[#667781]">Interesse: Phoenix 50cc</p>
+                  <div className="border border-[#e9edef] bg-[#f8f9fa] rounded-xl p-5 flex flex-col justify-center space-y-2 min-h-[160px]">
+                    <div className="grid grid-cols-2 gap-2">
+                      <div className="p-2.5 rounded-lg bg-sky-50 border border-sky-200 text-sky-700 text-xs font-semibold text-center">
+                        1. Leads
                       </div>
-                      <button 
-                        onClick={() => {
-                          const stages = ['LEAD', 'NEGOTIATION', 'PROPOSAL', 'CLOSED'];
-                          const nextIdx = (stages.indexOf(simulatedKanbanStage) + 1) % stages.length;
-                          setSimulatedKanbanStage(stages[nextIdx]);
-                        }}
-                        className="px-2.5 py-1.5 bg-[#00a884] hover:bg-emerald-500 text-white font-bold text-[9px] rounded-lg active:scale-95 transition-all shadow-sm border border-transparent"
-                      >
-                        Avançar Etapa
-                      </button>
+                      <div className="p-2.5 rounded-lg bg-amber-50 border border-amber-200 text-amber-700 text-xs font-semibold text-center">
+                        2. Em Negociação
+                      </div>
+                      <div className="p-2.5 rounded-lg bg-purple-50 border border-purple-200 text-purple-700 text-xs font-semibold text-center">
+                        3. Proposta Enviada
+                      </div>
+                      <div className="p-2.5 rounded-lg bg-emerald-50 border border-emerald-200 text-emerald-700 text-xs font-semibold text-center">
+                        4. Contrato Fechado
+                      </div>
                     </div>
                   </div>
 
                   <div className="space-y-2 text-center px-4">
-                    <h4 className="text-sm font-bold text-[#00a884]">Funil Comercial & Kanban</h4>
+                    <h4 className="text-sm font-bold text-[#00a884]">Funil Comercial & Pipeline</h4>
                     <p className="text-xs text-[#667781] leading-relaxed">
-                      Cada cliente pode ser livremente movido entre as 4 colunas de vendas (Leads ➔ Negociação ➔ Proposta ➔ Fechado). O estágio do contato é atualizado em tempo real na barra de chats e no painel Kanban da central.
+                      Acompanhe e classifique o status de cada lead ao longo da jornada de compra. A etapa comercial é salva diretamente no banco de dados SQLite e sincronizada em tempo real com toda a equipe de atendimento.
                     </p>
                   </div>
                 </div>
               )}
 
-              {/* SLIDE 2: Simulador do Copiloto IA & Anie */}
+              {/* SLIDE 2: Tags & Anotações */}
               {tutorialStep === 2 && (
                 <div className="space-y-4 animate-fade-in flex-1 flex flex-col">
-                  {/* Simulador Interativo do Chat de IA */}
-                  <div className="border border-[#e9edef] bg-[#f8f9fa] rounded-xl p-4 flex flex-col justify-between min-h-[160px] space-y-3">
-                    <div className="space-y-2 max-h-[100px] overflow-y-auto">
-                      {simulatedMessages.map((m, idx) => (
-                        <div key={idx} className={`flex ${m.fromMe ? 'justify-end' : 'justify-start'}`}>
-                          <div className={`p-2 rounded-lg text-[10px] max-w-[190px] leading-relaxed shadow-sm border ${
-                            m.fromMe ? 'bg-[#d9fdd3] border-[#d0f4ca] text-slate-800' : 'bg-white border-white text-slate-800'
-                          }`}>
-                            {m.text}
-                          </div>
-                        </div>
-                      ))}
-                      {simulatedAiTyping && (
-                        <div className="flex justify-start">
-                          <div className="bg-white text-[#00a884] text-[9px] font-bold p-2 rounded-lg animate-pulse border border-[#e9edef]">
-                            Anie está formulando sugestão...
-                          </div>
-                        </div>
-                      )}
-                    </div>
-
-                    <div className="flex gap-1.5 pt-1.5 border-t border-[#e9edef]">
-                      <button 
-                        onClick={() => selectSimulatedSuggestion('Olá! Conseguimos simular sem entrada no carnê. Qual o seu CPF?')}
-                        className="flex-1 bg-white border border-slate-300 hover:border-violet-400 p-1.5 text-[8px] text-slate-600 rounded text-left shadow-sm"
-                      >
-                        <strong>Anie Sugestão:</strong> "Simular no carnê..."
-                      </button>
-                    </div>
-                  </div>
-
-                  <div className="space-y-2 text-center px-4">
-                    <h4 className="text-sm font-bold text-[#00a884]">Copiloto IA & Sistema Anie</h4>
-                    <p className="text-xs text-[#667781] leading-relaxed">
-                      O atendimento automático e sugestões são geridos pela nossa inteligência artificial <strong>Anie</strong>. Na aba lateral da <strong>Anie</strong> no cliente, você pode configurar novas diretrizes ou solicitar uma modificação no comportamento do sistema enviando uma mensagem de WhatsApp para a nossa equipe de suporte para reconfiguração imediata.
-                    </p>
-                  </div>
-                </div>
-              )}
-
-              {/* SLIDE 3: Sincronização Progressiva Visual */}
-              {tutorialStep === 3 && (
-                <div className="space-y-4 animate-fade-in flex-1 flex flex-col">
-                  {/* Simulador Interativo do Progresso de Sync */}
                   <div className="border border-[#e9edef] bg-[#f8f9fa] rounded-xl p-5 flex flex-col justify-center space-y-3 min-h-[160px]">
-                    <div className="flex justify-between items-center text-[10px] text-slate-400 font-extrabold uppercase">
-                      <span>Status de Sync</span>
-                      <span className="text-[#00a884] font-bold">Faltam {Math.max(0, Math.floor((100 - simulatedSyncPercent) / 20))}s</span>
-                    </div>
-
-                    <div className="w-full bg-slate-200 rounded-full h-2 overflow-hidden border border-[#e9edef]">
-                      <div 
-                        className="bg-gradient-to-r from-emerald-500 to-[#00a884] h-full transition-all duration-300"
-                        style={{ width: `${simulatedSyncPercent}%` }}
-                      />
-                    </div>
-
-                    <div className="flex justify-between items-center">
-                      <span className="text-[9px] text-[#00a884] font-bold">Progresso: {simulatedSyncPercent}%</span>
-                      <button 
-                        onClick={runSimulatedSync}
-                        className="px-3 py-1 bg-white border border-slate-300 hover:bg-[#f5f6f6] text-slate-600 text-[9px] font-bold rounded-lg shadow-sm"
-                      >
-                        Simular Sync
-                      </button>
-                    </div>
-                  </div>
-
-                  <div className="space-y-2 text-center px-4">
-                    <h4 className="text-sm font-bold text-[#00a884]">Sincronização Progressiva com Estimativa</h4>
-                    <p className="text-xs text-[#667781] leading-relaxed">
-                      Ao carregar histórico anterior, o painel exibe uma barra de progresso verde calculando exatamente a porcentagem de download e o tempo restante estimado em segundos para a conclusão de cada chat.
-                    </p>
-                  </div>
-                </div>
-              )}
-
-              {/* SLIDE 4: Multi-Lojas e Estoque */}
-              {tutorialStep === 4 && (
-                <div className="space-y-4 animate-fade-in flex-1 flex flex-col">
-                  {/* Simulador Interativo de Estoque */}
-                  <div className="border border-[#e9edef] bg-[#f8f9fa] rounded-xl p-5 flex flex-col justify-center space-y-3 min-h-[160px]">
-                    <div className="flex justify-between items-center">
-                      <span className="text-[10px] text-slate-400 font-extrabold uppercase">Estoque: {simulatedStore}</span>
-                      <span className="text-xs font-extrabold text-[#00a884] bg-emerald-100 px-2 py-0.5 rounded">
-                        {simulatedStock} Motos Livres
+                    <div className="flex flex-wrap gap-1.5 justify-center">
+                      <span className="px-2.5 py-1 rounded-full bg-white border border-[#e9edef] text-[10px] font-bold text-slate-700 uppercase shadow-sm">
+                        # Shineray Jet 125
+                      </span>
+                      <span className="px-2.5 py-1 rounded-full bg-white border border-[#e9edef] text-[10px] font-bold text-slate-700 uppercase shadow-sm">
+                        # Entrada PIX
+                      </span>
+                      <span className="px-2.5 py-1 rounded-full bg-white border border-[#e9edef] text-[10px] font-bold text-slate-700 uppercase shadow-sm">
+                        # Visita Agendada
                       </span>
                     </div>
-
-                    <div className="flex gap-2">
-                      <button 
-                        onClick={() => setSimulatedStore(prev => prev === 'Matriz' ? 'Filial Norte' : 'Matriz')}
-                        className="flex-1 py-1.5 bg-white border border-slate-300 text-slate-700 text-[9px] font-bold rounded shadow-sm"
-                      >
-                        Mudar Filial
-                      </button>
-                      <button 
-                        onClick={runSimulatedReserve}
-                        disabled={simulatedReserveActive}
-                        className="flex-1 py-1.5 bg-[#00a884] text-white text-[9px] font-bold rounded shadow-sm border border-transparent disabled:opacity-50"
-                      >
-                        {simulatedReserveActive ? 'Reservando...' : 'Reservar Jet 125'}
-                      </button>
+                    <div className="p-2.5 rounded-lg bg-white border border-[#e9edef] text-[11px] text-slate-600 italic text-center shadow-sm">
+                      "Cliente prefere contato após as 14h para simulação de financiamento."
                     </div>
                   </div>
 
                   <div className="space-y-2 text-center px-4">
-                    <h4 className="text-sm font-bold text-[#00a884]">Gestão Corporativa de Filiais e Estoques</h4>
+                    <h4 className="text-sm font-bold text-[#00a884]">Tags & Anotações de Atendimento</h4>
                     <p className="text-xs text-[#667781] leading-relaxed">
-                      Gerencie estoques unificados e reserve veículos Shineray diretamente pela central corporativa. Operadores Administradores podem atualizar e alocar motocicletas instantaneamente para diferentes vendedores.
+                      Organize contatos com tags personalizadas e registre anotações detalhadas de cada negociação na ficha lateral do cliente. Todo o histórico fica salvo e vinculado ao número de telefone.
+                    </p>
+                  </div>
+                </div>
+              )}
+
+              {/* SLIDE 3: Sincronização de Histórico */}
+              {tutorialStep === 3 && (
+                <div className="space-y-4 animate-fade-in flex-1 flex flex-col">
+                  <div className="border border-[#e9edef] bg-[#f8f9fa] rounded-xl p-5 flex flex-col justify-center items-center space-y-3 min-h-[160px]">
+                    <div className="w-14 h-14 rounded-full bg-emerald-50 border border-emerald-200 flex items-center justify-center text-[#00a884]">
+                      <Database size={28} />
+                    </div>
+                    <span className="text-xs font-semibold text-slate-700">Persistência Local em SQLite</span>
+                  </div>
+
+                  <div className="space-y-2 text-center px-4">
+                    <h4 className="text-sm font-bold text-[#00a884]">Sincronização & Histórico Paginado</h4>
+                    <p className="text-xs text-[#667781] leading-relaxed">
+                      Suas mensagens são recebidas via WebSocket e salvas no banco de dados local. Ao abrir conversas antigas, utilize a paginação para carregar mensagens anteriores sob demanda com alta velocidade e confiabilidade.
+                    </p>
+                  </div>
+                </div>
+              )}
+
+              {/* SLIDE 4: Arquivamento & Segurança */}
+              {tutorialStep === 4 && (
+                <div className="space-y-4 animate-fade-in flex-1 flex flex-col">
+                  <div className="border border-[#e9edef] bg-[#f8f9fa] rounded-xl p-5 flex flex-col justify-center items-center space-y-3 min-h-[160px]">
+                    <div className="flex items-center gap-4">
+                      <div className="w-12 h-12 rounded-xl bg-amber-50 border border-amber-200 flex items-center justify-center text-amber-600">
+                        <FolderArchive size={24} />
+                      </div>
+                      <div className="w-12 h-12 rounded-xl bg-sky-50 border border-sky-200 flex items-center justify-center text-sky-600">
+                        <Lock size={24} />
+                      </div>
+                    </div>
+                    <span className="text-xs font-semibold text-slate-700">Organização e Autenticação JWT</span>
+                  </div>
+
+                  <div className="space-y-2 text-center px-4">
+                    <h4 className="text-sm font-bold text-[#00a884]">Arquivamento & Segurança</h4>
+                    <p className="text-xs text-[#667781] leading-relaxed">
+                      Mantenha sua lista limpa arquivando chats finalizados. Todas as operações são protegidas por autenticação JWT com senhas criptografadas em hash bcrypt no banco de dados.
                     </p>
                   </div>
                 </div>
@@ -1814,11 +1524,11 @@ export default function CRMInterface({ onGoToConnect, qrToken }) {
               <div className="space-y-1">
                 <h4 className="text-sm font-bold text-slate-800">Tem certeza?</h4>
                 <p className="text-xs text-slate-500 leading-relaxed">
-                  O dispositivo WhatsApp será desconectado e <strong>todas as mensagens locais</strong> desta sessão serão apagadas. Esta ação não pode ser desfeita.
+                  A sessão do WhatsApp será desconectada. As mensagens sincronizadas e dados de CRM permanecerão salvos com segurança no banco de dados local.
                 </p>
               </div>
               <div className="text-[10px] text-slate-500 bg-[#f0f2f5] p-2.5 rounded border border-[#e9edef] leading-relaxed text-left">
-                💡 Após desconectar, um novo link de QR Code será gerado automaticamente para reconexão.
+                💡 Para reconectar a qualquer momento, basta escanear o novo QR Code gerado pelo sistema.
               </div>
             </div>
 
@@ -1834,58 +1544,6 @@ export default function CRMInterface({ onGoToConnect, qrToken }) {
                 className="px-5 py-1.5 bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold rounded-lg shadow-sm transition-colors border border-transparent"
               >
                 Sim, Desconectar
-              </button>
-            </div>
-
-          </div>
-        </div>
-      )}
-
-      {/* MODAL 3: AVISO DE ACESSO NEGADO / OPERADOR JÚNIOR (Tema White / Light Mode) */}
-      {showAccessDeniedModal && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-fade-in">
-          <div className="bg-white border border-[#e9edef] rounded-xl w-full max-w-sm overflow-hidden flex flex-col shadow-2xl text-[#111b21]">
-            
-            <div className="bg-[#f0f2f5] p-4 flex items-center justify-between border-b border-[#e9edef]">
-              <div className="flex items-center gap-2 text-rose-500 font-bold text-xs uppercase tracking-wider">
-                <ShieldAlert size={18} />
-                <span>Aviso de Segurança</span>
-              </div>
-              <button 
-                onClick={() => setShowAccessDeniedModal(false)}
-                className="text-slate-400 hover:text-black"
-              >
-                <X size={16} />
-              </button>
-            </div>
-
-            <div className="p-6 text-center space-y-4">
-              <div className="w-12 h-12 rounded-full bg-rose-500/10 text-rose-500 flex items-center justify-center mx-auto border border-rose-500/20">
-                <ShieldAlert size={26} />
-              </div>
-              <div className="space-y-1">
-                <h4 className="text-sm font-bold text-slate-800">Acesso Restrito</h4>
-                <p className="text-xs text-slate-400 leading-relaxed">
-                  Esta funcionalidade não está disponível para seu nível de acesso.
-                </p>
-              </div>
-              <p className="text-[10px] text-slate-500 bg-[#f0f2f5] p-2.5 rounded border border-[#e9edef] leading-relaxed">
-                Seu usuário atual está classificado como operador de CRM Júnior (Visualização). Contatos de nível Administrador ou Suporte Pleno possuem direitos de digitação e edição de robôs.
-              </p>
-            </div>
-
-            <div className="bg-[#f0f2f5] p-3 flex justify-end gap-2 border-t border-[#e9edef]">
-              <button
-                onClick={() => setShowAccessDeniedModal(false)}
-                className="px-4 py-1.5 bg-white border border-slate-300 hover:bg-[#f5f6f6] text-xs font-semibold text-slate-600 rounded-lg transition-colors"
-              >
-                Voltar
-              </button>
-              <button
-                onClick={() => setShowAccessDeniedModal(false)}
-                className="px-5 py-1.5 bg-rose-600 hover:bg-rose-50 text-white text-xs font-bold rounded-lg shadow-sm transition-colors border border-transparent"
-              >
-                Confirmar
               </button>
             </div>
 
