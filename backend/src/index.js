@@ -4,16 +4,43 @@ import { createServer } from 'http';
 import { Server } from 'socket.io';
 import cors from 'cors';
 import dotenv from 'dotenv';
+import bcrypt from 'bcryptjs';
 import { initWhatsApp, getConnectionStatus, logoutWhatsApp, sendMessage, getWASocket, toggleArchiveChat } from './whatsapp.js';
 import { prisma } from './db.js';
+import { authenticateToken, requireRole, generateToken } from './auth.js';
+import { ensureDefaultAdmin } from './initAdmin.js';
 
 dotenv.config();
 
 const app = express();
 const server = createServer(app);
 
+// Configuração controlada de CORS (Segurança Fase 01)
+const allowedOrigins = process.env.ALLOWED_ORIGINS 
+  ? process.env.ALLOWED_ORIGINS.split(',').map(o => o.trim()) 
+  : ['http://localhost:5173', 'http://127.0.0.1:5173'];
+
 app.use(cors({
-  origin: '*', 
+  origin: (origin, callback) => {
+    // Permite requisições sem origin (como mobile apps ou curl) ou se bater com padrões locais/configurados
+    if (!origin) return callback(null, true);
+
+    const isAllowed = allowedOrigins.includes(origin) ||
+      origin.startsWith('http://localhost:') ||
+      origin.startsWith('http://127.0.0.1:') ||
+      origin.includes('192.168.') ||
+      origin.includes('10.') ||
+      origin.includes('172.') ||
+      origin.endsWith('.vercel.app') ||
+      origin.endsWith('.netlify.app');
+
+    if (isAllowed) {
+      return callback(null, true);
+    } else {
+      console.warn(`[CORS] Origem bloqueada por segurança: ${origin}`);
+      return callback(new Error('Origem não autorizada pela política de segurança CORS.'));
+    }
+  },
   methods: ['GET', 'POST', 'PUT', 'DELETE'],
   credentials: true
 }));
@@ -33,8 +60,11 @@ app.use((req, res, next) => {
   next();
 });
 
-// --- ROTAS DA API ---
+// --- ROTAS PÚBLICAS DE CONEXÃO E AUTENTICAÇÃO ---
 
+/**
+ * Status da conexão Baileys (Público para tela de QR Code externa)
+ */
 app.get('/api/status', (req, res) => {
   try {
     const status = getConnectionStatus();
@@ -44,43 +74,124 @@ app.get('/api/status', (req, res) => {
   }
 });
 
-app.post('/api/logout', async (req, res) => {
+/**
+ * Login Real de Operador com bcrypt e JWT
+ */
+app.post('/api/auth/login', async (req, res) => {
+  try {
+    const { email, password } = req.body;
+
+    if (!email || !password) {
+      return res.status(400).json({ error: 'E-mail e senha são obrigatórios.' });
+    }
+
+    const user = await prisma.user.findUnique({
+      where: { email: email.toLowerCase().trim() }
+    });
+
+    if (!user || !user.isActive) {
+      return res.status(401).json({ error: 'Credenciais inválidas ou operador inativo.' });
+    }
+
+    const isMatch = await bcrypt.compare(password, user.passwordHash);
+    if (!isMatch) {
+      return res.status(401).json({ error: 'Credenciais inválidas. Verifique seu login e senha.' });
+    }
+
+    const token = generateToken(user);
+
+    return res.json({
+      success: true,
+      token,
+      user: {
+        id: user.id,
+        email: user.email,
+        name: user.name,
+        role: user.role
+      }
+    });
+  } catch (error) {
+    console.error('[Auth API] Erro ao realizar login:', error);
+    return res.status(500).json({ error: 'Erro interno ao processar autenticação.' });
+  }
+});
+
+/**
+ * Retorna dados do usuário atualmente autenticado
+ */
+app.get('/api/auth/me', authenticateToken, async (req, res) => {
+  return res.json({ user: req.user });
+});
+
+// --- ROTAS DO WHATSAPP (SESSÃO) ---
+
+/**
+ * Desconecta o WhatsApp com segurança (não apaga os dados do CRM)
+ */
+app.post('/api/logout', authenticateToken, async (req, res) => {
   try {
     await logoutWhatsApp();
-    return res.json({ success: true, message: 'Desconectado com sucesso' });
+    return res.json({ success: true, message: 'WhatsApp desconectado com sucesso. Mensagens preservadas.' });
   } catch (error) {
     return res.status(500).json({ error: error.message });
   }
 });
 
-// Desconecta o WhatsApp E apaga TODOS os chats e mensagens do banco
-app.post('/api/disconnect', async (req, res) => {
+/**
+ * Rota mantida para retrocompatibilidade segura: desconecta WhatsApp sem apagar mensagens
+ */
+app.post('/api/disconnect', authenticateToken, async (req, res) => {
   try {
-    // 1. Desconecta o WhatsApp (Baileys)
     await logoutWhatsApp();
+    io.emit('whatsapp:disconnected');
+    return res.json({ success: true, message: 'WhatsApp desconectado com sucesso.' });
+  } catch (error) {
+    console.error('[API] Erro ao desconectar:', error);
+    return res.status(500).json({ error: error.message });
+  }
+});
 
-    // 2. Apaga todas as mensagens e chats do banco de dados
+/**
+ * Operação Administrativa Restrita: Apaga todas as mensagens e chats locais mediante confirmação de senha
+ */
+app.post('/api/admin/reset-database', authenticateToken, requireRole('ADMIN'), async (req, res) => {
+  try {
+    const { confirmPassword } = req.body;
+
+    if (!confirmPassword) {
+      return res.status(400).json({ error: 'A confirmação de senha administrativa é obrigatória.' });
+    }
+
+    const admin = await prisma.user.findUnique({
+      where: { id: req.user.id }
+    });
+
+    const isMatch = await bcrypt.compare(confirmPassword, admin.passwordHash);
+    if (!isMatch) {
+      return res.status(401).json({ error: 'Senha administrativa incorreta. Operação cancelada.' });
+    }
+
+    // Executa a limpeza apenas após validação estrita
     await prisma.message.deleteMany({});
     await prisma.chat.deleteMany({});
 
-    // 3. Notifica todos os clientes frontend via socket para limpar a tela
-    io.emit('whatsapp:disconnected');
     io.emit('chats:cleared');
+    console.warn(`[Segurança] Banco de dados limpo pelo administrador: ${req.user.email}`);
 
-    return res.json({ success: true, message: 'Dispositivo desconectado e dados apagados.' });
+    return res.json({ success: true, message: 'Banco de dados de conversas reinicializado com sucesso.' });
   } catch (error) {
-    console.error('[API] Erro ao desconectar e limpar dados:', error);
+    console.error('[API Admin] Erro ao resetar banco:', error);
     return res.status(500).json({ error: error.message });
   }
 });
 
+// --- ROTAS PROTEGIDAS DO CRM E CONVERSAS ---
 
-app.get('/api/chats', async (req, res) => {
+app.get('/api/chats', authenticateToken, async (req, res) => {
   try {
     const { search, funnelStage, tag, archived } = req.query;
     const whereClause = {};
 
-    // Filtra conversas arquivadas. Por padrão, se não for especificado, retorna apenas as NÃO arquivadas
     if (archived === 'true') {
       whereClause.isArchived = true;
     } else {
@@ -116,10 +227,10 @@ app.get('/api/chats', async (req, res) => {
   }
 });
 
-app.put('/api/chats/:id/archive', async (req, res) => {
+app.put('/api/chats/:id/archive', authenticateToken, async (req, res) => {
   try {
     const { id } = req.params;
-    const { archive } = req.body; // true ou false
+    const { archive } = req.body;
     
     if (archive === undefined) {
       return res.status(400).json({ error: 'O parâmetro archive (true/false) é obrigatório.' });
@@ -133,7 +244,7 @@ app.put('/api/chats/:id/archive', async (req, res) => {
   }
 });
 
-app.get('/api/chats/:id/messages', async (req, res) => {
+app.get('/api/chats/:id/messages', authenticateToken, async (req, res) => {
   try {
     const { id } = req.params;
 
@@ -149,14 +260,13 @@ app.get('/api/chats/:id/messages', async (req, res) => {
 
     io.emit('chat:updated', updatedChat);
 
-    // Retorna mensagens + total para o frontend saber se pode haver mais
     return res.json({ messages, total: messages.length });
   } catch (error) {
     return res.status(500).json({ error: error.message });
   }
 });
 
-app.post('/api/chats/:id/messages', async (req, res) => {
+app.post('/api/chats/:id/messages', authenticateToken, async (req, res) => {
   try {
     const { id } = req.params; 
     const { text } = req.body;
@@ -173,10 +283,7 @@ app.post('/api/chats/:id/messages', async (req, res) => {
   }
 });
 
-/**
- * Solicita mensagens antigas adicionais para um chat específico (paginação de histórico).
- */
-app.post('/api/chats/:id/load-history', async (req, res) => {
+app.post('/api/chats/:id/load-history', authenticateToken, async (req, res) => {
   try {
     const { id } = req.params;
     
@@ -189,7 +296,7 @@ app.post('/api/chats/:id/load-history', async (req, res) => {
     const socketObj = getWASocket();
     
     if (!socketObj) {
-      return res.status(400).json({ error: 'WhatsApp n\u00e3o est\u00e1 conectado.' });
+      return res.status(400).json({ error: 'WhatsApp não está conectado.' });
     }
 
     if (oldestMessage) {
@@ -211,19 +318,18 @@ app.post('/api/chats/:id/load-history', async (req, res) => {
       });
 
       await socketObj.fetchMessageHistory(count, key, Math.floor(oldestMessage.timestamp.getTime() / 1000));
-      return res.json({ success: true, hasMore: true, message: 'Solicita\u00e7\u00e3o de hist\u00f3rico anterior enviada.' });
+      return res.json({ success: true, hasMore: true, message: 'Solicitação de histórico anterior enviada.' });
     } else {
-      // Sem mensagem de refer\u00eancia = n\u00e3o h\u00e1 mais hist\u00f3rico para carregar
-      console.log(`[API] Chat ${id} n\u00e3o possui mensagens locais — hist\u00f3rico esgotado.`);
-      return res.json({ success: false, hasMore: false, message: 'Sem mais hist\u00f3rico dispon\u00edvel.' });
+      console.log(`[API] Chat ${id} não possui mensagens locais — histórico esgotado.`);
+      return res.json({ success: false, hasMore: false, message: 'Sem mais histórico disponível.' });
     }
   } catch (error) {
-    console.error('[API] Erro ao solicitar hist\u00f3rico do WhatsApp:', error);
+    console.error('[API] Erro ao solicitar histórico do WhatsApp:', error);
     return res.status(500).json({ error: error.message });
   }
 });
 
-app.put('/api/chats/:id/crm', async (req, res) => {
+app.put('/api/chats/:id/crm', authenticateToken, async (req, res) => {
   try {
     const { id } = req.params;
     const { funnelStage, tags, notes, name } = req.body;
@@ -262,6 +368,10 @@ const PORT = process.env.PORT || 5000;
 
 server.listen(PORT, async () => {
   console.log(`[Server] Servidor backend rodando na porta ${PORT}`);
+  
+  // Inicializa o administrador padrão com senha hashada (Fase 01 - Segurança)
+  await ensureDefaultAdmin();
+
   try {
     await initWhatsApp(io);
   } catch (err) {

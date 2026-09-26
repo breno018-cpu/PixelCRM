@@ -75,12 +75,12 @@ export default function CRMInterface({ onGoToConnect, qrToken }) {
     loadMoreMessages
   } = useCRM();
 
-  // Autenticação de Usuário
-  // Persiste login na sessionStorage (sobrevive F5, some ao fechar a aba)
-  const [isLoggedIn, setIsLoggedIn] = useState(() => sessionStorage.getItem('crm_session') === 'authenticated');
+  // Autenticação Real com JWT (Fase 01 - Segurança)
+  const [isLoggedIn, setIsLoggedIn] = useState(() => !!localStorage.getItem('crm_token'));
   const [emailInput, setEmailInput] = useState('');
   const [passwordInput, setPasswordInput] = useState('');
   const [loginError, setLoginError] = useState('');
+  const [isLoggingIn, setIsLoggingIn] = useState(false);
   const [showDisconnectConfirm, setShowDisconnectConfirm] = useState(false);
 
   const [activeTab, setActiveTab] = useState('chats'); // 'chats' | 'dashboard' | 'automations'
@@ -113,9 +113,8 @@ export default function CRMInterface({ onGoToConnect, qrToken }) {
   };
 
   // Splash Screen e Carregamento PixelLoom (Ultra-Minimalist Style)
-  // Se já logado (sessionStorage), pula o boot apenas na primeira montagem
-  const [isBooted, setIsBooted] = useState(() => sessionStorage.getItem('crm_session') === 'authenticated');
-  const [bootProgress, setBootProgress] = useState(() => sessionStorage.getItem('crm_session') === 'authenticated' ? 100 : 0);
+  const [isBooted, setIsBooted] = useState(() => !!localStorage.getItem('crm_token'));
+  const [bootProgress, setBootProgress] = useState(() => localStorage.getItem('crm_token') ? 100 : 0);
 
   // Estados Interativos para Simulações do Tutorial Dinâmico
   const [simulatedKanbanStage, setSimulatedKanbanStage] = useState('LEAD');
@@ -190,37 +189,69 @@ export default function CRMInterface({ onGoToConnect, qrToken }) {
     };
   }, [activeChat, selectChat]);
 
-  const handleLoginSubmit = (e) => {
+  // Escuta expiração de sessão para retornar ao login
+  useEffect(() => {
+    const handleUnauthorized = () => {
+      setIsLoggedIn(false);
+      setIsBooted(false);
+      setBootProgress(0);
+    };
+    window.addEventListener('auth:unauthorized', handleUnauthorized);
+    return () => window.removeEventListener('auth:unauthorized', handleUnauthorized);
+  }, []);
+
+  const handleLoginSubmit = async (e) => {
     e.preventDefault();
     setLoginError('');
+    setIsLoggingIn(true);
 
-    const targetEmail = 'shinerayl1mh@view.com';
-    const targetPassword = 'hadade123';
+    try {
+      const response = await fetch(`${backendUrl}/api/auth/login`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          email: emailInput.trim(),
+          password: passwordInput
+        })
+      });
 
-    if (emailInput.trim().toLowerCase() === targetEmail && passwordInput === targetPassword) {
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Credenciais inválidas. Verifique seu login e senha.');
+      }
+
+      localStorage.setItem('crm_token', data.token);
+      localStorage.setItem('crm_user', JSON.stringify(data.user));
       sessionStorage.setItem('crm_session', 'authenticated');
       setIsLoggedIn(true);
-    } else {
-      // Pequeno delay para prevenir brute-force básico
-      setTimeout(() => setLoginError('Credenciais inválidas. Verifique seu login e senha.'), 400);
+    } catch (err) {
+      setLoginError(err.message || 'Erro ao comunicar com o servidor de autenticação.');
+    } finally {
+      setIsLoggingIn(false);
     }
   };
 
-  // Desconecta o WhatsApp e limpa todas as mensagens locais
+  // Desconecta o WhatsApp com segurança (preserva as conversas e notas de CRM)
   const handleDisconnectWhatsApp = async () => {
     try {
-      // Chama o endpoint que desconecta o WhatsApp E apaga todos os dados do banco
-      await fetch(`${backendUrl}/api/disconnect`, { method: 'POST' });
+      const token = localStorage.getItem('crm_token');
+      await fetch(`${backendUrl}/api/logout`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
     } catch (e) {
-      console.error('Erro ao desconectar:', e);
+      console.error('Erro ao desconectar WhatsApp:', e);
     }
     setShowDisconnectConfirm(false);
-    // Recarrega a página para limpar todo o estado local da interface
-    window.location.reload();
   };
 
   // Sair do sistema (CRM logout)
   const handleSystemLogout = () => {
+    localStorage.removeItem('crm_token');
+    localStorage.removeItem('crm_user');
     sessionStorage.removeItem('crm_session');
     setIsLoggedIn(false);
     setIsBooted(false);
@@ -411,10 +442,20 @@ export default function CRMInterface({ onGoToConnect, qrToken }) {
 
             <button
               type="submit"
-              className="w-full py-3 bg-[#00a884] hover:bg-emerald-500 text-white font-bold text-xs rounded-lg active:scale-95 transition-all shadow-md border border-transparent mt-2 flex items-center justify-center gap-1.5"
+              disabled={isLoggingIn}
+              className="w-full py-3 bg-[#00a884] hover:bg-emerald-500 disabled:opacity-50 text-white font-bold text-xs rounded-lg active:scale-95 transition-all shadow-md border border-transparent mt-2 flex items-center justify-center gap-1.5"
             >
-              <Lock size={13} />
-              Acessar Workspace
+              {isLoggingIn ? (
+                <>
+                  <Loader2 size={13} className="animate-spin" />
+                  Autenticando...
+                </>
+              ) : (
+                <>
+                  <Lock size={13} />
+                  Acessar Workspace
+                </>
+              )}
             </button>
           </form>
 

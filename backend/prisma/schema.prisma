@@ -36,4 +36,19 @@ model Message {
   mediaUrl    String?
   timestamp   DateTime
   status      String   @default("PENDING") // PENDING, SENT, DELIVERED, READ
+
+  @@index([chatId])
+  @@index([timestamp])
 }
+
+model User {
+  id           String    @id @default(uuid())
+  email        String    @unique
+  passwordHash String
+  name         String
+  role         String    @default("OPERATOR") // ADMIN, MANAGER, OPERATOR
+  isActive     Boolean   @default(true)
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+}
+

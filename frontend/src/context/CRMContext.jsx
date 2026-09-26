@@ -3,6 +3,29 @@ import { useSocket } from './SocketContext';
 
 const CRMContext = createContext(null);
 
+/**
+ * Utilitário para requisições autenticadas com JWT no CRM
+ */
+export const authFetch = async (url, options = {}) => {
+  const token = localStorage.getItem('crm_token');
+  const headers = {
+    ...(options.headers || {}),
+    ...(token ? { 'Authorization': `Bearer ${token}` } : {})
+  };
+
+  const response = await fetch(url, { ...options, headers });
+
+  if (response.status === 401) {
+    console.warn('[Auth] Requisição não autorizada (401). Sessão expirada.');
+    localStorage.removeItem('crm_token');
+    localStorage.removeItem('crm_user');
+    sessionStorage.removeItem('crm_session');
+    window.dispatchEvent(new Event('auth:unauthorized'));
+  }
+
+  return response;
+};
+
 export const CRMProvider = ({ children }) => {
   const { socket, backendUrl } = useSocket();
   const [chats, setChats] = useState([]);
@@ -36,7 +59,7 @@ export const CRMProvider = ({ children }) => {
         params.append('archived', 'false');
       }
 
-      const response = await fetch(`${backendUrl}/api/chats?${params.toString()}`);
+      const response = await authFetch(`${backendUrl}/api/chats?${params.toString()}`);
       if (response.ok) {
         const data = await response.json();
         setChats(data);
@@ -52,7 +75,7 @@ export const CRMProvider = ({ children }) => {
   const fetchMessages = useCallback(async (chatId) => {
     setLoadingMessages(true);
     try {
-      const response = await fetch(`${backendUrl}/api/chats/${chatId}/messages`);
+      const response = await authFetch(`${backendUrl}/api/chats/${chatId}/messages`);
       if (response.ok) {
         const data = await response.json();
         // Suporta tanto o formato antigo (array) quanto o novo ({messages, total})
@@ -195,7 +218,7 @@ export const CRMProvider = ({ children }) => {
     if (!activeChat) return;
 
     try {
-      const response = await fetch(`${backendUrl}/api/chats/${activeChat.id}/messages`, {
+      const response = await authFetch(`${backendUrl}/api/chats/${activeChat.id}/messages`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'
@@ -217,7 +240,7 @@ export const CRMProvider = ({ children }) => {
   // Atualiza as notas, estágio de funil e tags no banco de dados
   const updateCRMInfo = async (chatId, crmData) => {
     try {
-      const response = await fetch(`${backendUrl}/api/chats/${chatId}/crm`, {
+      const response = await authFetch(`${backendUrl}/api/chats/${chatId}/crm`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json'
@@ -230,7 +253,7 @@ export const CRMProvider = ({ children }) => {
         
         // Atualiza os estados locais
         setChats(prev => 
-          prev.map(c => c.id === chatId ? { ...c, ...updatedChat } : c)
+            prev.map(c => c.id === chatId ? { ...c, ...updatedChat } : c)
         );
 
         if (activeChat && activeChat.id === chatId) {
@@ -245,7 +268,7 @@ export const CRMProvider = ({ children }) => {
   // Arquivar ou desarquivar uma conversa
   const archiveChat = async (chatId, archive) => {
     try {
-      const response = await fetch(`${backendUrl}/api/chats/${chatId}/archive`, {
+      const response = await authFetch(`${backendUrl}/api/chats/${chatId}/archive`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json'
@@ -274,7 +297,7 @@ export const CRMProvider = ({ children }) => {
   const loadMoreMessages = async (chatId) => {
     setLoadingMoreMessages(true);
     try {
-      const response = await fetch(`${backendUrl}/api/chats/${chatId}/load-history`, {
+      const response = await authFetch(`${backendUrl}/api/chats/${chatId}/load-history`, {
         method: 'POST'
       });
       const data = await response.json();
