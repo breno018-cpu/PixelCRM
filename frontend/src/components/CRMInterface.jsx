@@ -10,7 +10,8 @@ import {
   FolderOpen, ArrowLeft, Sparkles, Cpu, Bot, Sliders, Play, GitFork, Lock,
   Globe, Database, Key, ShoppingBag, Layers, Percent, FileCheck, FileCode, SendHorizontal, Activity,
   Pause, Mic, Download, ChevronUp, ChevronDown, File,
-  Building2, Building, UserCheck, UserPlus, ShieldCheck, MapPin
+  Building2, Building, UserCheck, UserPlus, ShieldCheck, MapPin,
+  Kanban, LayoutGrid, ArrowRight, Filter
 } from 'lucide-react';
 
 // LOGO CUSTOMIZADA DA PIXEL LOOM (Intersecção de linhas e tecelagem de pixels)
@@ -295,7 +296,21 @@ export default function CRMInterface({ onGoToConnect, qrToken }) {
   const [teamLoading, setTeamLoading] = useState(false);
   const [teamMsg, setTeamMsg] = useState({ type: '', text: '' });
 
-  const [activeTab, setActiveTab] = useState('chats'); // 'chats' | 'dashboard' | 'automations'
+  // Pipeline Comercial Real & Kanban (Fase 06)
+  const [draggingChatId, setDraggingChatId] = useState(null);
+  const [dragOverStage, setDragOverStage] = useState(null);
+  const [kanbanSearch, setKanbanSearch] = useState('');
+  const [kanbanStoreFilter, setKanbanStoreFilter] = useState('');
+  const [kanbanUserFilter, setKanbanUserFilter] = useState('');
+
+  const handleDropStage = async (chatId, newStage) => {
+    if (!chatId || !newStage) return;
+    const targetChat = chats.find(c => c.id === chatId);
+    if (!targetChat || targetChat.funnelStage === newStage) return;
+    await updateCRMInfo(chatId, { funnelStage: newStage });
+  };
+
+  const [activeTab, setActiveTab] = useState('chats'); // 'chats' | 'kanban'
   const [messageInput, setMessageInput] = useState('');
   const [isSendingMessage, setIsSendingMessage] = useState(false);
   const [sendError, setSendError] = useState('');
@@ -804,6 +819,21 @@ export default function CRMInterface({ onGoToConnect, qrToken }) {
               )}
             </button>
 
+            {/* Pipeline Comercial / Kanban */}
+            <button
+              onClick={() => {
+                setActiveTab('kanban');
+              }}
+              className={`w-11 h-11 rounded-full flex items-center justify-center transition-all relative ${
+                activeTab === 'kanban'
+                  ? 'bg-[#eae6df] text-[#00a884]'
+                  : 'text-[#54656f] hover:bg-[#eae6df] hover:text-[#111b21]'
+              }`}
+              title="Pipeline Comercial (Kanban)"
+            >
+              <Kanban size={22} />
+            </button>
+
             {/* Arquivados */}
             <button
               onClick={() => {
@@ -913,6 +943,13 @@ export default function CRMInterface({ onGoToConnect, qrToken }) {
               </span>
 
               <div className="flex items-center gap-1.5 text-[#54656f]">
+                <button
+                  onClick={() => setActiveTab('kanban')}
+                  className="p-2 hover:bg-[#eae6df] rounded-full text-[#667781] hover:text-[#00a884] transition-colors"
+                  title="Abrir Pipeline Comercial (Kanban)"
+                >
+                  <Kanban size={18} />
+                </button>
                 {archivedView && (
                   <button 
                     onClick={() => {
@@ -1807,6 +1844,283 @@ export default function CRMInterface({ onGoToConnect, qrToken }) {
             </aside>
           )}
 
+        </div>
+      )}
+
+      {/* 3. KANBAN PIPELINE VIEW (Fase 06 - Pipeline Comercial Real) */}
+      {activeTab === 'kanban' && (
+        <div className="flex-1 overflow-hidden h-full bg-[#f0f2f5] flex flex-col">
+          {/* Header do Kanban */}
+          <header className="h-[60px] bg-white border-b border-[#e9edef] px-6 flex items-center justify-between shrink-0 shadow-sm">
+            <div className="flex items-center gap-3">
+              <div className="w-9 h-9 rounded-lg bg-[#00a884]/10 text-[#00a884] flex items-center justify-center font-bold">
+                <Kanban size={20} />
+              </div>
+              <div>
+                <h2 className="text-sm font-bold text-[#111b21]">Pipeline Comercial & Funil de Vendas</h2>
+                <p className="text-[10px] text-[#667781]">Arraste e solte os cards entre as colunas para atualizar a etapa do lead em tempo real</p>
+              </div>
+            </div>
+
+            {/* Ações e Filtros do Kanban */}
+            <div className="flex items-center gap-2.5">
+              {/* Busca */}
+              <div className="relative bg-[#f0f2f5] rounded-lg flex items-center px-3 py-1.5 border border-[#e9edef] focus-within:border-[#00a884] w-52">
+                <Search size={14} className="text-[#667781] mr-2 shrink-0" />
+                <input
+                  type="text"
+                  placeholder="Buscar lead ou telefone..."
+                  value={kanbanSearch}
+                  onChange={(e) => setKanbanSearch(e.target.value)}
+                  className="bg-transparent border-none text-xs text-[#111b21] focus:outline-none w-full placeholder-[#667781]"
+                />
+                {kanbanSearch && (
+                  <button onClick={() => setKanbanSearch('')} className="text-slate-400 hover:text-black">
+                    <X size={12} />
+                  </button>
+                )}
+              </div>
+
+              {/* Filtro por Filial */}
+              <select
+                value={kanbanStoreFilter}
+                onChange={(e) => setKanbanStoreFilter(e.target.value)}
+                className="text-xs bg-[#f0f2f5] text-[#111b21] border border-[#e9edef] rounded-lg px-2.5 py-1.5 font-medium focus:outline-none focus:ring-1 focus:ring-[#00a884]"
+                title="Filtrar por Filial"
+              >
+                <option value="">Todas Filiais ({stores.length})</option>
+                {stores.map(s => (
+                  <option key={s.id} value={s.id}>{s.name}</option>
+                ))}
+              </select>
+
+              {/* Filtro por Atendente */}
+              <select
+                value={kanbanUserFilter}
+                onChange={(e) => setKanbanUserFilter(e.target.value)}
+                className="text-xs bg-[#f0f2f5] text-[#111b21] border border-[#e9edef] rounded-lg px-2.5 py-1.5 font-medium focus:outline-none focus:ring-1 focus:ring-[#00a884]"
+                title="Filtrar por Atendente"
+              >
+                <option value="">Todos Atendentes</option>
+                <option value="unassigned">Não Atribuídos</option>
+                {currentUser && (
+                  <option value={currentUser.id}>Meus ({currentUser.name ? currentUser.name.split(' ')[0] : 'Eu'})</option>
+                )}
+                {users.filter(u => !currentUser || u.id !== currentUser.id).map(u => (
+                  <option key={u.id} value={u.id}>{u.name || u.email}</option>
+                ))}
+              </select>
+
+              {/* Botão de Atalho para Conversas */}
+              <button
+                onClick={() => setActiveTab('chats')}
+                className="px-3.5 py-1.5 bg-[#00a884] hover:bg-emerald-600 text-white text-xs font-bold rounded-lg flex items-center gap-1.5 shadow-sm transition-all"
+              >
+                <MessageSquare size={14} />
+                <span>Ver Conversas</span>
+              </button>
+            </div>
+          </header>
+
+          {/* Kanban Board Colunas */}
+          <div className="flex-1 overflow-x-auto p-6 flex gap-5">
+            {[
+              { id: 'LEAD', label: 'Leads', headerColor: 'border-t-sky-500', dot: 'bg-sky-500', badge: 'bg-sky-100 text-sky-800' },
+              { id: 'NEGOTIATION', label: 'Em Negociação', headerColor: 'border-t-amber-500', dot: 'bg-amber-500', badge: 'bg-amber-100 text-amber-800' },
+              { id: 'PROPOSAL', label: 'Proposta Enviada', headerColor: 'border-t-purple-500', dot: 'bg-purple-500', badge: 'bg-purple-100 text-purple-800' },
+              { id: 'CLOSED', label: 'Contrato Fechado', headerColor: 'border-t-[#00a884]', dot: 'bg-[#00a884]', badge: 'bg-emerald-100 text-emerald-800' }
+            ].map(col => {
+              // Filtra os chats para esta coluna
+              const stageChats = chats.filter(c => {
+                if (c.isArchived) return false;
+                if (c.funnelStage !== col.id) return false;
+                if (kanbanStoreFilter && c.storeId !== kanbanStoreFilter) return false;
+                if (kanbanUserFilter) {
+                  if (kanbanUserFilter === 'unassigned' && c.assignedUserId) return false;
+                  if (kanbanUserFilter !== 'unassigned' && c.assignedUserId !== kanbanUserFilter) return false;
+                }
+                if (kanbanSearch) {
+                  const q = kanbanSearch.toLowerCase();
+                  const matchName = (c.name || '').toLowerCase().includes(q);
+                  const matchPhone = (c.phone || '').toLowerCase().includes(q);
+                  const matchPush = (c.pushName || '').toLowerCase().includes(q);
+                  const matchTags = (c.tags || '').toLowerCase().includes(q);
+                  if (!matchName && !matchPhone && !matchPush && !matchTags) return false;
+                }
+                return true;
+              });
+
+              const isDragOver = dragOverStage === col.id;
+
+              return (
+                <div
+                  key={col.id}
+                  onDragOver={(e) => {
+                    e.preventDefault();
+                    e.dataTransfer.dropEffect = 'move';
+                  }}
+                  onDragEnter={() => setDragOverStage(col.id)}
+                  onDragLeave={(e) => {
+                    if (!e.currentTarget.contains(e.relatedTarget)) {
+                      setDragOverStage(null);
+                    }
+                  }}
+                  onDrop={async (e) => {
+                    e.preventDefault();
+                    setDragOverStage(null);
+                    const chatId = e.dataTransfer.getData('text/plain');
+                    if (chatId) {
+                      await handleDropStage(chatId, col.id);
+                    }
+                  }}
+                  className={`flex-1 min-w-[280px] max-w-[340px] bg-white rounded-2xl border flex flex-col shadow-sm transition-all border-t-4 ${col.headerColor} ${
+                    isDragOver 
+                      ? 'border-[#00a884] ring-2 ring-[#00a884]/30 bg-emerald-50/20' 
+                      : 'border-[#e9edef]'
+                  }`}
+                >
+                  {/* Cabeçalho da Coluna */}
+                  <div className="p-4 border-b border-[#e9edef] flex items-center justify-between bg-white rounded-t-xl shrink-0">
+                    <div className="flex items-center gap-2">
+                      <span className={`w-2.5 h-2.5 rounded-full ${col.dot}`} />
+                      <h3 className="text-xs font-bold text-[#111b21] uppercase tracking-wide">
+                        {col.label}
+                      </h3>
+                    </div>
+                    <span className={`text-[11px] font-bold px-2 py-0.5 rounded-full ${col.badge}`}>
+                      {stageChats.length}
+                    </span>
+                  </div>
+
+                  {/* Lista de Cards da Coluna */}
+                  <div className="flex-1 overflow-y-auto p-3 space-y-3 bg-[#f8f9fa]">
+                    {stageChats.length === 0 ? (
+                      <div className="h-40 border-2 border-dashed border-[#e9edef] rounded-xl flex flex-col items-center justify-center p-4 text-center">
+                        <p className="text-xs text-slate-400 font-medium">Nenhum lead nesta etapa</p>
+                        <p className="text-[10px] text-slate-400 mt-1">Arraste um card até aqui</p>
+                      </div>
+                    ) : (
+                      stageChats.map(chat => {
+                        const isDragging = draggingChatId === chat.id;
+
+                        return (
+                          <div
+                            key={chat.id}
+                            draggable
+                            onDragStart={(e) => {
+                              e.dataTransfer.setData('text/plain', chat.id);
+                              setDraggingChatId(chat.id);
+                            }}
+                            onDragEnd={() => setDraggingChatId(null)}
+                            className={`bg-white rounded-xl p-3.5 border border-[#e9edef] shadow-sm hover:shadow-md transition-all cursor-grab active:cursor-grabbing space-y-2.5 select-none ${
+                              isDragging ? 'opacity-40 scale-95 border-dashed border-[#00a884]' : ''
+                            }`}
+                          >
+                            {/* Card Top: Avatar + Nome + Tempo */}
+                            <div className="flex items-start justify-between gap-2">
+                              <div className="flex items-center gap-2.5 min-w-0">
+                                {chat.avatarUrl ? (
+                                  <img
+                                    src={chat.avatarUrl}
+                                    alt={chat.name || chat.phone}
+                                    className="w-8 h-8 rounded-full object-cover border border-[#e9edef] shrink-0"
+                                    referrerPolicy="no-referrer"
+                                  />
+                                ) : (
+                                  <div className="w-8 h-8 rounded-full bg-slate-200 text-slate-600 font-bold text-xs flex items-center justify-center border border-slate-300 shrink-0">
+                                    {chat.name ? chat.name.charAt(0).toUpperCase() : <User size={14} />}
+                                  </div>
+                                )}
+                                <div className="min-w-0">
+                                  <h4 className="text-xs font-bold text-[#111b21] truncate">
+                                    {chat.name || chat.phone}
+                                  </h4>
+                                  <p className="text-[10px] text-[#667781] truncate">{chat.phone}</p>
+                                </div>
+                              </div>
+                              <span className="text-[9px] text-[#667781] shrink-0 font-medium">
+                                {chat.lastMessageTime ? formatTime(chat.lastMessageTime) : ''}
+                              </span>
+                            </div>
+
+                            {/* Card Middle: Última mensagem */}
+                            {chat.lastMessageText && (
+                              <p className="text-[11px] text-slate-600 line-clamp-2 bg-[#f8f9fa] p-2 rounded-lg border border-[#e9edef]/60">
+                                {chat.lastMessageText}
+                              </p>
+                            )}
+
+                            {/* Badges de Filial & Atendente */}
+                            <div className="flex flex-wrap items-center gap-1.5 text-[9px]">
+                              {chat.store && (
+                                <span className="inline-flex items-center gap-1 bg-slate-100 text-slate-700 px-2 py-0.5 rounded font-medium border border-slate-200/60">
+                                  <Building size={10} className="text-slate-400" />
+                                  <span className="truncate max-w-[120px]">{chat.store.name}</span>
+                                </span>
+                              )}
+                              {chat.assignedUser ? (
+                                <span className="inline-flex items-center gap-1 bg-emerald-50 text-emerald-700 px-2 py-0.5 rounded font-medium border border-emerald-200/50">
+                                  <UserCheck size={10} className="text-emerald-500" />
+                                  <span className="truncate max-w-[120px]">{chat.assignedUser.name || chat.assignedUser.email}</span>
+                                </span>
+                              ) : (
+                                <span className="inline-flex items-center gap-1 bg-amber-50 text-amber-600 px-2 py-0.5 rounded italic border border-amber-200/50">
+                                  Não atribuído
+                                </span>
+                              )}
+                            </div>
+
+                            {/* Tags do Lead */}
+                            {chat.tags && (
+                              <div className="flex flex-wrap gap-1">
+                                {chat.tags.split(',').filter(Boolean).map((t, idx) => (
+                                  <span
+                                    key={idx}
+                                    className="bg-white border border-[#e9edef] text-slate-600 text-[8px] px-1.5 py-0.5 rounded font-bold uppercase"
+                                  >
+                                    #{t}
+                                  </span>
+                                ))}
+                              </div>
+                            )}
+
+                            {/* Card Footer: Ação Rápida e Troca de Estágio */}
+                            <div className="pt-2 border-t border-[#e9edef] flex items-center justify-between gap-2">
+                              {/* Seletor rápido de estágio */}
+                              <select
+                                value={chat.funnelStage}
+                                onChange={(e) => handleDropStage(chat.id, e.target.value)}
+                                className="text-[10px] bg-[#f0f2f5] text-slate-700 font-semibold border border-[#e9edef] rounded px-1.5 py-1 focus:outline-none cursor-pointer"
+                                title="Alterar estágio comercial"
+                              >
+                                <option value="LEAD">Leads</option>
+                                <option value="NEGOTIATION">Negociação</option>
+                                <option value="PROPOSAL">Proposta</option>
+                                <option value="CLOSED">Fechado</option>
+                              </select>
+
+                              {/* Botão de abrir conversa */}
+                              <button
+                                onClick={() => {
+                                  selectChat(chat);
+                                  setActiveTab('chats');
+                                }}
+                                className="px-2.5 py-1 bg-[#00a884] hover:bg-emerald-600 text-white text-[10px] font-bold rounded flex items-center gap-1 shadow-sm transition-all"
+                                title="Abrir conversa com este cliente"
+                              >
+                                <MessageSquare size={11} />
+                                <span>Conversar</span>
+                              </button>
+                            </div>
+                          </div>
+                        );
+                      })
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
         </div>
       )}
 

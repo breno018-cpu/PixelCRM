@@ -365,7 +365,13 @@ app.put('/api/chats/:id/crm', authenticateToken, async (req, res) => {
 
     const updatedChat = await prisma.chat.update({
       where: { id },
-      data: updatedData
+      data: updatedData,
+      include: {
+        store: true,
+        assignedUser: {
+          select: { id: true, name: true, email: true, role: true }
+        }
+      }
     });
 
     io.emit('chat:updated', updatedChat);
