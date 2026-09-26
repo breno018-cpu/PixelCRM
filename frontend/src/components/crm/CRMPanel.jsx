@@ -22,6 +22,9 @@ import {
 } from 'lucide-react';
 import { TOKENS } from '../../design-system/tokens';
 
+import CustomerProfile from './CustomerProfile';
+import AssignmentSelector from './AssignmentSelector';
+
 /**
  * CRMPanel
  * Painel Contextual do CRM Shineray integrado à lateral direita do Chat.
@@ -33,6 +36,8 @@ export default function CRMPanel({
   onClose,
   onUpdateFunnelStage,
   onAssignChat,
+  onUpdateName,
+  isUpdatingName = false,
   stores = [],
   users = [],
   onAddTag,
@@ -192,93 +197,21 @@ export default function CRMPanel({
           <div className="space-y-5 animate-fade-in">
             {/* Slot do Perfil do Cliente ou Perfil Padrão */}
             {customerProfileSlot ? customerProfileSlot : (
-              <div className="flex flex-col items-center text-center p-4 bg-[var(--active-bg,#f0f2f5)]/50 border border-[var(--border-subtle,#e9edef)] rounded-xl">
-                {activeChat.avatarUrl ? (
-                  <img 
-                    src={activeChat.avatarUrl} 
-                    alt={activeChat.name || activeChat.phone} 
-                    className="w-18 h-18 rounded-full object-cover shrink-0 select-none border-2 border-white dark:border-slate-800 shadow-md mb-2.5" 
-                    referrerPolicy="no-referrer"
-                  />
-                ) : (
-                  <div className="w-18 h-18 rounded-full bg-[var(--brand-primary,#00a884)]/15 text-[var(--brand-primary,#00a884)] flex items-center justify-center text-2xl font-bold border border-[var(--brand-primary,#00a884)]/30 shadow-sm mb-2.5">
-                    {activeChat.name ? activeChat.name.charAt(0).toUpperCase() : <User size={28} />}
-                  </div>
-                )}
-                
-                <h4 className="text-sm font-bold text-[var(--text-primary,#111b21)]">
-                  {activeChat.name || activeChat.pushName || activeChat.phone}
-                </h4>
-                
-                <div className="flex items-center gap-1.5 text-xs text-[var(--text-secondary,#667781)] mt-0.5">
-                  <Phone size={12} />
-                  <span>{activeChat.phone}</span>
-                </div>
-
-                <div className="mt-3 inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-bold shadow-xs"
-                  style={{ backgroundColor: funnelToken.bg, color: funnelToken.color, borderColor: funnelToken.border }}
-                >
-                  <span className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: funnelToken.color }} />
-                  <span>{funnelToken.label}</span>
-                </div>
-              </div>
+              <CustomerProfile
+                activeChat={activeChat}
+                onUpdateName={onUpdateName}
+                isUpdatingName={isUpdatingName}
+              />
             )}
 
             {/* Slot de Atribuições ou Seletor Padrão */}
             {assignmentSlot ? assignmentSlot : (
-              <div className="space-y-3.5 bg-[var(--bg-panel,#ffffff)] border border-[var(--border-subtle,#e9edef)] rounded-xl p-3.5 shadow-xs">
-                <span className="text-[10px] font-bold text-[var(--text-secondary,#667781)] uppercase tracking-wider block">
-                  Responsáveis Comerciais
-                </span>
-
-                {/* Filial */}
-                <div className="space-y-1">
-                  <label className="text-[11px] font-medium text-[var(--text-primary,#111b21)] flex items-center gap-1.5">
-                    <Store size={13} className="text-[var(--brand-primary,#00a884)]" />
-                    <span>Filial Shineray</span>
-                  </label>
-                  <select
-                    value={activeChat.storeId || ''}
-                    onChange={async (e) => {
-                      const newStoreId = e.target.value || null;
-                      if (onAssignChat) {
-                        await onAssignChat(activeChat.id, { storeId: newStoreId, assignedUserId: activeChat.assignedUserId });
-                      }
-                    }}
-                    className="w-full bg-[var(--active-bg,#f0f2f5)] border border-[var(--border-subtle,#e9edef)] rounded-lg px-2.5 py-2 text-xs text-[var(--text-primary,#111b21)] font-medium focus:outline-none focus:ring-1 focus:ring-[var(--brand-primary,#00a884)] cursor-pointer"
-                  >
-                    <option value="">Sem Filial Atribuída</option>
-                    {stores.map(s => (
-                      <option key={s.id} value={s.id}>{s.name}</option>
-                    ))}
-                  </select>
-                </div>
-
-                {/* Atendente */}
-                <div className="space-y-1">
-                  <label className="text-[11px] font-medium text-[var(--text-primary,#111b21)] flex items-center gap-1.5">
-                    <UserCheck size={13} className="text-[var(--brand-primary,#00a884)]" />
-                    <span>Consultor de Vendas</span>
-                  </label>
-                  <select
-                    value={activeChat.assignedUserId || ''}
-                    onChange={async (e) => {
-                      const newUserId = e.target.value || null;
-                      if (onAssignChat) {
-                        await onAssignChat(activeChat.id, { storeId: activeChat.storeId, assignedUserId: newUserId });
-                      }
-                    }}
-                    className="w-full bg-[var(--active-bg,#f0f2f5)] border border-[var(--border-subtle,#e9edef)] rounded-lg px-2.5 py-2 text-xs text-[var(--text-primary,#111b21)] font-medium focus:outline-none focus:ring-1 focus:ring-[var(--brand-primary,#00a884)] cursor-pointer"
-                  >
-                    <option value="">Não Atribuído</option>
-                    {users.map(u => (
-                      <option key={u.id} value={u.id}>
-                        {u.name || u.email} ({u.role === 'ADMIN' ? 'Admin' : 'Operador'})
-                      </option>
-                    ))}
-                  </select>
-                </div>
-              </div>
+              <AssignmentSelector
+                activeChat={activeChat}
+                stores={stores}
+                users={users}
+                onAssignChat={onAssignChat}
+              />
             )}
 
             {/* Resumo de Tags Rápidas no Overview */}
