@@ -785,6 +785,80 @@ app.get('/api/dashboard/stats', authenticateToken, async (req, res) => {
   }
 });
 
+// --- AUTOMAÇÕES REAIS DE ATENDIMENTO (Fase 08) ---
+
+app.get('/api/automations', authenticateToken, async (req, res) => {
+  try {
+    const automations = await prisma.automation.findMany({
+      orderBy: { createdAt: 'asc' }
+    });
+    return res.json(automations);
+  } catch (error) {
+    return res.status(500).json({ error: error.message });
+  }
+});
+
+app.post('/api/automations', authenticateToken, requireRole('ADMIN'), async (req, res) => {
+  try {
+    const { name, type, enabled, message, startHour, endHour, workDays } = req.body;
+    if (!type || !message) {
+      return res.status(400).json({ error: 'Tipo e mensagem da automação são obrigatórios.' });
+    }
+
+    const created = await prisma.automation.create({
+      data: {
+        name: name || type,
+        type,
+        enabled: enabled ?? false,
+        message,
+        startHour: startHour ? Number(startHour) : 8,
+        endHour: endHour ? Number(endHour) : 18,
+        workDays: workDays || '1,2,3,4,5'
+      }
+    });
+
+    return res.status(201).json(created);
+  } catch (error) {
+    return res.status(500).json({ error: error.message });
+  }
+});
+
+app.put('/api/automations/:id', authenticateToken, requireRole('ADMIN'), async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { name, enabled, message, startHour, endHour, workDays } = req.body;
+
+    const dataToUpdate = {};
+    if (name !== undefined) dataToUpdate.name = name;
+    if (enabled !== undefined) dataToUpdate.enabled = enabled;
+    if (message !== undefined) dataToUpdate.message = message;
+    if (startHour !== undefined) dataToUpdate.startHour = Number(startHour);
+    if (endHour !== undefined) dataToUpdate.endHour = Number(endHour);
+    if (workDays !== undefined) dataToUpdate.workDays = workDays;
+
+    const updated = await prisma.automation.update({
+      where: { id },
+      data: dataToUpdate
+    });
+
+    return res.json(updated);
+  } catch (error) {
+    return res.status(500).json({ error: error.message });
+  }
+});
+
+app.delete('/api/automations/:id', authenticateToken, requireRole('ADMIN'), async (req, res) => {
+  try {
+    const { id } = req.params;
+    await prisma.automation.delete({
+      where: { id }
+    });
+    return res.json({ success: true });
+  } catch (error) {
+    return res.status(500).json({ error: error.message });
+  }
+});
+
 // --- CONEXÃO WEBSOCKET ---
 
 io.on('connection', (socket) => {

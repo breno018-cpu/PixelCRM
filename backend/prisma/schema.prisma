@@ -38,6 +38,8 @@ model Chat {
   assignedUserId  String?
   assignedUser    User?     @relation(fields: [assignedUserId], references: [id], onDelete: SetNull)
 
+  lastAutoReplyTime DateTime?
+
   createdAt       DateTime  @default(now())
   updatedAt       DateTime  @updatedAt
   messages        Message[]
@@ -79,4 +81,17 @@ model User {
   updatedAt    DateTime  @updatedAt
 
   @@index([storeId])
+}
+
+model Automation {
+  id          String   @id @default(uuid())
+  name        String
+  type        String   @unique // WELCOME, OUT_OF_HOURS
+  enabled     Boolean  @default(false)
+  message     String
+  startHour   Int      @default(8)   // 08:00
+  endHour     Int      @default(18)  // 18:00
+  workDays    String   @default("1,2,3,4,5") // 1=Segunda ... 5=Sexta, 6=Sábado, 0=Domingo
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
 }

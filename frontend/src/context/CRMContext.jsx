@@ -54,6 +54,10 @@ export const CRMProvider = ({ children }) => {
   const [dashboardStats, setDashboardStats] = useState(null);
   const [loadingDashboardStats, setLoadingDashboardStats] = useState(false);
 
+  // Regras de Automação Reais (Fase 08)
+  const [automations, setAutomations] = useState([]);
+  const [loadingAutomations, setLoadingAutomations] = useState(false);
+
   // Busca a lista de chats da API
   const fetchChats = useCallback(async () => {
     setLoadingChats(true);
@@ -495,6 +499,48 @@ export const CRMProvider = ({ children }) => {
     }
   }, [backendUrl]);
 
+  // Busca regras de automação
+  const fetchAutomations = useCallback(async () => {
+    setLoadingAutomations(true);
+    try {
+      const response = await authFetch(`${backendUrl}/api/automations`);
+      if (response.ok) {
+        const data = await response.json();
+        setAutomations(data);
+        return data;
+      }
+    } catch (e) {
+      console.error('[CRM] Erro ao buscar automações:', e);
+    } finally {
+      setLoadingAutomations(false);
+    }
+  }, [backendUrl]);
+
+  // Atualiza regra de automação
+  const updateAutomation = async (id, dataToUpdate) => {
+    try {
+      const response = await authFetch(`${backendUrl}/api/automations/${id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(dataToUpdate)
+      });
+      if (response.ok) {
+        const updated = await response.json();
+        setAutomations(prev => prev.map(a => a.id === id ? updated : a));
+        return { success: true, automation: updated };
+      }
+      const err = await response.json();
+      return { success: false, error: err.error };
+    } catch (e) {
+      return { success: false, error: e.message };
+    }
+  };
+
+  // Carrega automações ao montar
+  useEffect(() => {
+    fetchAutomations();
+  }, [fetchAutomations]);
+
   return (
     <CRMContext.Provider value={{
       chats,
@@ -512,6 +558,10 @@ export const CRMProvider = ({ children }) => {
       setFilterUserId,
       stores,
       users,
+      automations,
+      loadingAutomations,
+      fetchAutomations,
+      updateAutomation,
       dashboardStats,
       loadingDashboardStats,
       fetchDashboardStats,

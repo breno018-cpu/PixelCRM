@@ -601,11 +601,13 @@ async function saveMessage(msg, shouldEmit = true) {
     }
   }
 
+  let isNewChat = false;
   let chat = await prisma.chat.findUnique({
     where: { id: jid }
   });
 
   if (!chat) {
+    isNewChat = true;
     chat = await prisma.chat.create({
       data: {
         id: jid,
@@ -753,6 +755,13 @@ async function saveMessage(msg, shouldEmit = true) {
     }
   });
 
+  // Executa regras automáticas para mensagens recebidas de clientes (Fase 08)
+  if (!fromMe) {
+    processAutomations(chat, isNewChat).catch((err) => {
+      console.error('[Automation] Erro ao executar regras automáticas:', err);
+    });
+  }
+
   return savedMsg;
 }
 
@@ -792,6 +801,74 @@ export async function sendMessage(jid, text) {
   ioInstance?.emit('chat:updated', updatedChat);
 
   return savedMsg;
+}
+
+/**
+ * Executa as regras de automação configuradas no CRM (Fase 08)
+ */
+async function processAutomations(chat, isNewChat) {
+  try {
+    if (!sock || !chat || chat.id === 'status@broadcast') return;
+
+    const now = new Date();
+    const currentHour = now.getHours();
+    const currentDay = now.getDay(); // 0 = Domingo, 1 = Segunda ... 6 = Sábado
+
+    // 1. Regra de Boas-Vindas (somente para novo lead/chat)
+    if (isNewChat) {
+      const welcomeRule = await prisma.automation.findUnique({
+        where: { type: 'WELCOME' }
+      });
+
+      if (welcomeRule && welcomeRule.enabled && welcomeRule.message) {
+        setTimeout(async () => {
+          try {
+            await sendMessage(chat.id, welcomeRule.message);
+            console.log(`[Automation] Mensagem de boas-vindas enviada para ${chat.id}`);
+          } catch (err) {
+            console.error('[Automation] Falha ao enviar boas-vindas:', err);
+          }
+        }, 1500);
+        return;
+      }
+    }
+
+    // 2. Regra de Ausência / Fora do Horário Comercial
+    const outRule = await prisma.automation.findUnique({
+      where: { type: 'OUT_OF_HOURS' }
+    });
+
+    if (outRule && outRule.enabled && outRule.message) {
+      const workDaysList = (outRule.workDays || '1,2,3,4,5')
+        .split(',')
+        .map(d => parseInt(d.trim(), 10));
+      const isWorkDay = workDaysList.includes(currentDay);
+      const isWorkHour = currentHour >= outRule.startHour && currentHour < outRule.endHour;
+
+      const isOutOfHours = !isWorkDay || !isWorkHour;
+
+      if (isOutOfHours) {
+        const twelveHoursAgo = new Date(Date.now() - 12 * 60 * 60 * 1000);
+        if (!chat.lastAutoReplyTime || new Date(chat.lastAutoReplyTime) < twelveHoursAgo) {
+          await prisma.chat.update({
+            where: { id: chat.id },
+            data: { lastAutoReplyTime: now }
+          });
+
+          setTimeout(async () => {
+            try {
+              await sendMessage(chat.id, outRule.message);
+              console.log(`[Automation] Mensagem fora de expediente enviada para ${chat.id}`);
+            } catch (err) {
+              console.error('[Automation] Falha ao enviar ausência:', err);
+            }
+          }, 2000);
+        }
+      }
+    }
+  } catch (error) {
+    console.error('[Automation] Erro ao processar automações:', error);
+  }
 }
 
 /**

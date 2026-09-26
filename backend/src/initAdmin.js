@@ -52,7 +52,49 @@ export async function ensureDefaultAdmin() {
       data: { storeId: defaultStore.id }
     });
 
+    // Inicializa regras padrão de automação se não existirem
+    await ensureDefaultAutomations();
+
   } catch (error) {
     console.error('[Auth] Erro ao verificar/inicializar administrador e loja padrão:', error);
+  }
+}
+
+export async function ensureDefaultAutomations() {
+  try {
+    const welcome = await prisma.automation.findUnique({
+      where: { type: 'WELCOME' }
+    });
+    if (!welcome) {
+      await prisma.automation.create({
+        data: {
+          name: 'Mensagem de Boas-Vindas',
+          type: 'WELCOME',
+          enabled: false,
+          message: 'Olá! Seja bem-vindo à Shineray. Como podemos te ajudar hoje?'
+        }
+      });
+      console.log('[Automation] Regra de boas-vindas inicializada no banco.');
+    }
+
+    const outOfHours = await prisma.automation.findUnique({
+      where: { type: 'OUT_OF_HOURS' }
+    });
+    if (!outOfHours) {
+      await prisma.automation.create({
+        data: {
+          name: 'Mensagem Fora do Horário Comercial',
+          type: 'OUT_OF_HOURS',
+          enabled: false,
+          startHour: 8,
+          endHour: 18,
+          workDays: '1,2,3,4,5',
+          message: 'Nosso horário de atendimento é de segunda a sexta, das 08h às 18h. Recebemos sua mensagem e retornaremos assim que iniciarmos o expediente!'
+        }
+      });
+      console.log('[Automation] Regra fora de horário inicializada no banco.');
+    }
+  } catch (error) {
+    console.error('[Automation] Erro ao inicializar regras padrão:', error);
   }
 }

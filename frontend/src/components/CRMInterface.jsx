@@ -248,6 +248,10 @@ export default function CRMInterface({ onGoToConnect, qrToken }) {
     setFilterUserId,
     stores,
     users,
+    automations,
+    loadingAutomations,
+    fetchAutomations,
+    updateAutomation,
     dashboardStats,
     loadingDashboardStats,
     fetchDashboardStats,
@@ -317,7 +321,89 @@ export default function CRMInterface({ onGoToConnect, qrToken }) {
   const [dashStoreFilter, setDashStoreFilter] = useState('');
   const [dashUserFilter, setDashUserFilter] = useState('');
 
-  const [activeTab, setActiveTab] = useState('chats'); // 'chats' | 'kanban' | 'dashboard'
+  // Central de Automações Reais (Fase 08)
+  const [welcomeForm, setWelcomeForm] = useState({ id: null, enabled: false, message: '' });
+  const [outOfHoursForm, setOutOfHoursForm] = useState({
+    id: null,
+    enabled: false,
+    message: '',
+    startHour: 8,
+    endHour: 18,
+    workDays: '1,2,3,4,5'
+  });
+  const [savingAutomationType, setSavingAutomationType] = useState(null);
+  const [automationSavedAlert, setAutomationSavedAlert] = useState(null);
+
+  useEffect(() => {
+    const welcome = automations.find(a => a.type === 'WELCOME');
+    if (welcome) {
+      setWelcomeForm({
+        id: welcome.id,
+        enabled: welcome.enabled,
+        message: welcome.message || ''
+      });
+    }
+
+    const out = automations.find(a => a.type === 'OUT_OF_HOURS');
+    if (out) {
+      setOutOfHoursForm({
+        id: out.id,
+        enabled: out.enabled,
+        message: out.message || '',
+        startHour: out.startHour ?? 8,
+        endHour: out.endHour ?? 18,
+        workDays: out.workDays || '1,2,3,4,5'
+      });
+    }
+  }, [automations]);
+
+  const handleSaveWelcome = async () => {
+    if (!welcomeForm.id) return;
+    setSavingAutomationType('WELCOME');
+    const res = await updateAutomation(welcomeForm.id, {
+      enabled: welcomeForm.enabled,
+      message: welcomeForm.message
+    });
+    setSavingAutomationType(null);
+    if (res.success) {
+      setAutomationSavedAlert('Mensagem de boas-vindas salva com sucesso!');
+      setTimeout(() => setAutomationSavedAlert(null), 3500);
+    }
+  };
+
+  const handleSaveOutOfHours = async () => {
+    if (!outOfHoursForm.id) return;
+    setSavingAutomationType('OUT_OF_HOURS');
+    const res = await updateAutomation(outOfHoursForm.id, {
+      enabled: outOfHoursForm.enabled,
+      message: outOfHoursForm.message,
+      startHour: parseInt(outOfHoursForm.startHour, 10),
+      endHour: parseInt(outOfHoursForm.endHour, 10),
+      workDays: outOfHoursForm.workDays
+    });
+    setSavingAutomationType(null);
+    if (res.success) {
+      setAutomationSavedAlert('Regra de atendimento fora do horário salva com sucesso!');
+      setTimeout(() => setAutomationSavedAlert(null), 3500);
+    }
+  };
+
+  const toggleWorkDay = (dayNum) => {
+    const current = (outOfHoursForm.workDays || '')
+      .split(',')
+      .map(s => s.trim())
+      .filter(Boolean);
+    const dayStr = String(dayNum);
+    let next;
+    if (current.includes(dayStr)) {
+      next = current.filter(d => d !== dayStr);
+    } else {
+      next = [...current, dayStr].sort((a, b) => Number(a) - Number(b));
+    }
+    setOutOfHoursForm(prev => ({ ...prev, workDays: next.join(',') }));
+  };
+
+  const [activeTab, setActiveTab] = useState('chats'); // 'chats' | 'kanban' | 'dashboard' | 'automations'
 
   // Efeito para carregar métricas do dashboard
   useEffect(() => {
@@ -864,6 +950,24 @@ export default function CRMInterface({ onGoToConnect, qrToken }) {
               title="Dashboard & Inteligência Comercial"
             >
               <BarChart3 size={22} />
+            </button>
+
+            {/* Central de Automações & Regras (Fase 08) */}
+            <button
+              onClick={() => {
+                setActiveTab('automations');
+              }}
+              className={`w-11 h-11 rounded-full flex items-center justify-center transition-all relative ${
+                activeTab === 'automations'
+                  ? 'bg-[#eae6df] text-[#00a884]'
+                  : 'text-[#54656f] hover:bg-[#eae6df] hover:text-[#111b21]'
+              }`}
+              title="Central de Automações & Regras"
+            >
+              <Bot size={22} />
+              {automations.some(a => a.enabled) && (
+                <span className="absolute top-2 right-2 w-2 h-2 rounded-full bg-[#00a884]" />
+              )}
             </button>
 
             {/* Arquivados */}
@@ -2469,6 +2573,305 @@ export default function CRMInterface({ onGoToConnect, qrToken }) {
                 </div>
               </>
             ) : null}
+          </div>
+        </div>
+      )}
+
+      {/* ABA: CENTRAL DE AUTOMAÇÕES E REGRAS (Fase 08) */}
+      {activeTab === 'automations' && (
+        <div className="flex-1 flex flex-col bg-[#f0f2f5] overflow-y-auto">
+          {/* Header */}
+          <div className="bg-white border-b border-[#e9edef] px-6 py-4 flex flex-col sm:flex-row sm:items-center justify-between gap-4 sticky top-0 z-10 shadow-sm">
+            <div>
+              <div className="flex items-center gap-2">
+                <Bot className="w-5 h-5 text-[#00a884]" />
+                <h1 className="text-lg font-bold text-[#111b21]">
+                  Central de Automações & Regras de Atendimento
+                </h1>
+              </div>
+              <p className="text-xs text-[#667781] mt-0.5">
+                Respostas automáticas reais disparadas pelo motor Baileys diretamente aos contatos do WhatsApp.
+              </p>
+            </div>
+
+            <div className="flex items-center gap-3">
+              {automationSavedAlert && (
+                <div className="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-50 border border-emerald-200 text-emerald-700 text-xs font-semibold rounded-lg shadow-sm animate-fade-in">
+                  <CheckCheck className="w-4 h-4 text-emerald-600" />
+                  <span>{automationSavedAlert}</span>
+                </div>
+              )}
+              <button
+                onClick={() => fetchAutomations()}
+                disabled={loadingAutomations}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-[#d1d7db] text-xs font-semibold text-[#54656f] hover:bg-[#f0f2f5] transition-colors"
+                title="Recarregar regras"
+              >
+                <RefreshCw className={`w-3.5 h-3.5 ${loadingAutomations ? 'animate-spin' : ''}`} />
+                <span>Atualizar</span>
+              </button>
+            </div>
+          </div>
+
+          {/* Conteúdo */}
+          <div className="p-6 max-w-6xl w-full mx-auto space-y-6">
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              
+              {/* CARD 1: MENSAGEM DE BOAS-VINDAS */}
+              <div className="bg-white rounded-2xl border border-[#e9edef] p-6 shadow-sm flex flex-col justify-between hover:border-[#00a884]/40 transition-all">
+                <div className="space-y-4">
+                  <div className="flex items-start justify-between gap-4 pb-3 border-b border-[#f0f2f5]">
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 rounded-xl bg-emerald-50 text-[#00a884] flex items-center justify-center font-bold">
+                        <Sparkles className="w-5 h-5" />
+                      </div>
+                      <div>
+                        <h2 className="text-sm font-bold text-[#111b21]">Mensagem de Boas-Vindas</h2>
+                        <p className="text-[11px] text-[#667781]">
+                          Enviada no primeiro contato de um novo cliente/lead
+                        </p>
+                      </div>
+                    </div>
+
+                    {/* Toggle Switch */}
+                    <label className="relative inline-flex items-center cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={welcomeForm.enabled}
+                        onChange={(e) => setWelcomeForm(prev => ({ ...prev, enabled: e.target.checked }))}
+                        className="sr-only peer"
+                      />
+                      <div className="w-11 h-6 bg-slate-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-[#00a884]"></div>
+                    </label>
+                  </div>
+
+                  <div className="space-y-2">
+                    <label className="text-xs font-semibold text-[#111b21] flex items-center justify-between">
+                      <span>Texto da Mensagem</span>
+                      <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold ${
+                        welcomeForm.enabled ? 'bg-emerald-100 text-emerald-800' : 'bg-slate-100 text-slate-500'
+                      }`}>
+                        {welcomeForm.enabled ? 'Regra Ativa' : 'Desativada'}
+                      </span>
+                    </label>
+                    <textarea
+                      rows={5}
+                      value={welcomeForm.message}
+                      onChange={(e) => setWelcomeForm(prev => ({ ...prev, message: e.target.value }))}
+                      placeholder="Olá! Seja bem-vindo à Shineray do Brasil. Como posso te ajudar hoje?"
+                      className="w-full text-xs p-3 rounded-xl border border-[#d1d7db] focus:border-[#00a884] focus:ring-1 focus:ring-[#00a884] outline-none text-[#111b21] placeholder:text-slate-400 resize-none transition-all"
+                    />
+                  </div>
+
+                  <div className="bg-[#f8f9fa] rounded-xl p-3 border border-[#e9edef] text-[11px] text-[#667781] space-y-1">
+                    <div className="flex items-center gap-1.5 font-semibold text-[#111b21]">
+                      <Clock className="w-3.5 h-3.5 text-[#00a884]" />
+                      <span>Comportamento do Motor:</span>
+                    </div>
+                    <p>
+                      Disparo automático executado 1.5s após a chegada da primeira mensagem (messages.upsert) do novo lead, simulando digitação humana.
+                    </p>
+                  </div>
+                </div>
+
+                <div className="pt-4 border-t border-[#f0f2f5] mt-6 flex justify-end">
+                  <button
+                    onClick={handleSaveWelcome}
+                    disabled={savingAutomationType === 'WELCOME'}
+                    className="flex items-center gap-2 px-4 py-2 bg-[#00a884] hover:bg-[#008f6f] text-white text-xs font-bold rounded-xl shadow-sm transition-all disabled:opacity-50"
+                  >
+                    {savingAutomationType === 'WELCOME' ? (
+                      <>
+                        <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                        <span>Salvando...</span>
+                      </>
+                    ) : (
+                      <>
+                        <Save className="w-3.5 h-3.5" />
+                        <span>Salvar Boas-Vindas</span>
+                      </>
+                    )}
+                  </button>
+                </div>
+              </div>
+
+              {/* CARD 2: FORA DO HORÁRIO COMERCIAL */}
+              <div className="bg-white rounded-2xl border border-[#e9edef] p-6 shadow-sm flex flex-col justify-between hover:border-[#00a884]/40 transition-all">
+                <div className="space-y-4">
+                  <div className="flex items-start justify-between gap-4 pb-3 border-b border-[#f0f2f5]">
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center font-bold">
+                        <Clock className="w-5 h-5" />
+                      </div>
+                      <div>
+                        <h2 className="text-sm font-bold text-[#111b21]">Horário de Atendimento</h2>
+                        <p className="text-[11px] text-[#667781]">
+                          Aviso automático enviado fora do expediente das concessionárias
+                        </p>
+                      </div>
+                    </div>
+
+                    {/* Toggle Switch */}
+                    <label className="relative inline-flex items-center cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={outOfHoursForm.enabled}
+                        onChange={(e) => setOutOfHoursForm(prev => ({ ...prev, enabled: e.target.checked }))}
+                        className="sr-only peer"
+                      />
+                      <div className="w-11 h-6 bg-slate-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-[#00a884]"></div>
+                    </label>
+                  </div>
+
+                  {/* Horários de Início e Fim */}
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="text-[11px] font-semibold text-[#667781] block mb-1">
+                        Início do Expediente
+                      </label>
+                      <select
+                        value={outOfHoursForm.startHour}
+                        onChange={(e) => setOutOfHoursForm(prev => ({ ...prev, startHour: parseInt(e.target.value, 10) }))}
+                        className="w-full text-xs p-2 rounded-xl border border-[#d1d7db] bg-white text-[#111b21] font-semibold focus:border-[#00a884] outline-none"
+                      >
+                        {Array.from({ length: 24 }).map((_, i) => (
+                          <option key={i} value={i}>
+                            {String(i).padStart(2, '0')}:00h
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+
+                    <div>
+                      <label className="text-[11px] font-semibold text-[#667781] block mb-1">
+                        Fim do Expediente
+                      </label>
+                      <select
+                        value={outOfHoursForm.endHour}
+                        onChange={(e) => setOutOfHoursForm(prev => ({ ...prev, endHour: parseInt(e.target.value, 10) }))}
+                        className="w-full text-xs p-2 rounded-xl border border-[#d1d7db] bg-white text-[#111b21] font-semibold focus:border-[#00a884] outline-none"
+                      >
+                        {Array.from({ length: 24 }).map((_, i) => (
+                          <option key={i} value={i}>
+                            {String(i).padStart(2, '0')}:00h
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  </div>
+
+                  {/* Dias da Semana */}
+                  <div>
+                    <label className="text-[11px] font-semibold text-[#667781] block mb-1.5">
+                      Dias de Atendimento (Expediente Aberto)
+                    </label>
+                    <div className="flex flex-wrap gap-1.5">
+                      {[
+                        { num: 1, label: 'Seg' },
+                        { num: 2, label: 'Ter' },
+                        { num: 3, label: 'Qua' },
+                        { num: 4, label: 'Qui' },
+                        { num: 5, label: 'Sex' },
+                        { num: 6, label: 'Sáb' },
+                        { num: 0, label: 'Dom' },
+                      ].map(day => {
+                        const isSelected = (outOfHoursForm.workDays || '')
+                          .split(',')
+                          .map(s => s.trim())
+                          .includes(String(day.num));
+                        return (
+                          <button
+                            key={day.num}
+                            type="button"
+                            onClick={() => toggleWorkDay(day.num)}
+                            className={`px-2.5 py-1 rounded-lg text-[11px] font-bold transition-all border ${
+                              isSelected
+                                ? 'bg-[#00a884] text-white border-[#00a884]'
+                                : 'bg-[#f8f9fa] text-slate-500 border-[#e9edef] hover:border-slate-300'
+                            }`}
+                          >
+                            {day.label}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+
+                  <div className="space-y-2">
+                    <label className="text-xs font-semibold text-[#111b21] flex items-center justify-between">
+                      <span>Mensagem de Ausência</span>
+                      <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold ${
+                        outOfHoursForm.enabled ? 'bg-blue-100 text-blue-800' : 'bg-slate-100 text-slate-500'
+                      }`}>
+                        {outOfHoursForm.enabled ? 'Regra Ativa' : 'Desativada'}
+                      </span>
+                    </label>
+                    <textarea
+                      rows={3}
+                      value={outOfHoursForm.message}
+                      onChange={(e) => setOutOfHoursForm(prev => ({ ...prev, message: e.target.value }))}
+                      placeholder="Olá! Agradecemos o contato. Nosso atendimento funciona de segunda a sexta, das 08h às 18h. Responderemos em breve!"
+                      className="w-full text-xs p-3 rounded-xl border border-[#d1d7db] focus:border-[#00a884] focus:ring-1 focus:ring-[#00a884] outline-none text-[#111b21] placeholder:text-slate-400 resize-none transition-all"
+                    />
+                  </div>
+
+                  <div className="bg-[#f8f9fa] rounded-xl p-3 border border-[#e9edef] text-[11px] text-[#667781] space-y-1">
+                    <div className="flex items-center gap-1.5 font-semibold text-[#111b21]">
+                      <ShieldCheck className="w-3.5 h-3.5 text-blue-600" />
+                      <span>Proteção Anti-Flood Ativa (12h):</span>
+                    </div>
+                    <p>
+                      O sistema armazena o timestamp do último disparo (lastAutoReplyTime) e só envia uma resposta de ausência a cada 12 horas por contato.
+                    </p>
+                  </div>
+                </div>
+
+                <div className="pt-4 border-t border-[#f0f2f5] mt-6 flex justify-end">
+                  <button
+                    onClick={handleSaveOutOfHours}
+                    disabled={savingAutomationType === 'OUT_OF_HOURS'}
+                    className="flex items-center gap-2 px-4 py-2 bg-[#00a884] hover:bg-[#008f6f] text-white text-xs font-bold rounded-xl shadow-sm transition-all disabled:opacity-50"
+                  >
+                    {savingAutomationType === 'OUT_OF_HOURS' ? (
+                      <>
+                        <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                        <span>Salvando...</span>
+                      </>
+                    ) : (
+                      <>
+                        <Save className="w-3.5 h-3.5" />
+                        <span>Salvar Horário</span>
+                      </>
+                    )}
+                  </button>
+                </div>
+              </div>
+
+            </div>
+
+            {/* CARD 3: AUDITORIA E ARQUITETURA DO MOTOR */}
+            <div className="bg-white rounded-2xl border border-[#e9edef] p-5 shadow-sm flex flex-col md:flex-row items-center justify-between gap-4">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-slate-100 flex items-center justify-center text-slate-700">
+                  <Database className="w-5 h-5" />
+                </div>
+                <div>
+                  <h4 className="text-xs font-bold text-[#111b21]">
+                    Arquitetura Full-Stack: Baileys WebSocket + SQLite Transacional
+                  </h4>
+                  <p className="text-[11px] text-[#667781]">
+                    Todas as regras são consultadas dinamicamente no banco dev.db pelo backend em cada mensagem recebida, garantindo execução mesmo sem tela aberta.
+                  </p>
+                </div>
+              </div>
+              <div className="flex items-center gap-2 shrink-0">
+                <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                  <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+                  Motor Server-Side Ativo
+                </span>
+              </div>
+            </div>
+
           </div>
         </div>
       )}
