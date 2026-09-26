@@ -189,7 +189,7 @@ app.post('/api/admin/reset-database', authenticateToken, requireRole('ADMIN'), a
 
 app.get('/api/chats', authenticateToken, async (req, res) => {
   try {
-    const { search, funnelStage, tag, archived } = req.query;
+    const { search, funnelStage, tag, archived, storeId, assignedUserId } = req.query;
     const whereClause = {};
 
     if (archived === 'true') {
@@ -214,8 +214,31 @@ app.get('/api/chats', authenticateToken, async (req, res) => {
       whereClause.tags = { contains: tag };
     }
 
+    if (storeId) {
+      whereClause.storeId = storeId;
+    }
+
+    if (assignedUserId) {
+      if (assignedUserId === 'unassigned') {
+        whereClause.assignedUserId = null;
+      } else {
+        whereClause.assignedUserId = assignedUserId;
+      }
+    }
+
     const chats = await prisma.chat.findMany({
       where: whereClause,
+      include: {
+        store: true,
+        assignedUser: {
+          select: {
+            id: true,
+            name: true,
+            email: true,
+            role: true
+          }
+        }
+      },
       orderBy: {
         lastMessageTime: 'desc'
       }
@@ -348,6 +371,245 @@ app.put('/api/chats/:id/crm', authenticateToken, async (req, res) => {
     io.emit('chat:updated', updatedChat);
 
     return res.json(updatedChat);
+  } catch (error) {
+    return res.status(500).json({ error: error.message });
+  }
+});
+
+/**
+ * Atribui uma conversa a uma filial e/ou atendente (Fase 05)
+ */
+app.put('/api/chats/:id/assign', authenticateToken, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { storeId, assignedUserId } = req.body;
+
+    const dataToUpdate = {};
+    if (storeId !== undefined) {
+      dataToUpdate.storeId = storeId || null;
+    }
+    if (assignedUserId !== undefined) {
+      dataToUpdate.assignedUserId = assignedUserId || null;
+    }
+
+    const updatedChat = await prisma.chat.update({
+      where: { id },
+      data: dataToUpdate,
+      include: {
+        store: true,
+        assignedUser: {
+          select: {
+            id: true,
+            name: true,
+            email: true,
+            role: true
+          }
+        }
+      }
+    });
+
+    io.emit('chat:updated', updatedChat);
+    return res.json(updatedChat);
+  } catch (error) {
+    console.error('[API] Erro ao atribuir conversa:', error);
+    return res.status(500).json({ error: error.message });
+  }
+});
+
+// --- GESTÃO DE FILIAIS E LOJAS (Fase 05) ---
+
+app.get('/api/stores', authenticateToken, async (req, res) => {
+  try {
+    const stores = await prisma.store.findMany({
+      include: {
+        _count: {
+          select: {
+            users: true,
+            chats: true
+          }
+        }
+      },
+      orderBy: { name: 'asc' }
+    });
+    return res.json(stores);
+  } catch (error) {
+    return res.status(500).json({ error: error.message });
+  }
+});
+
+app.post('/api/stores', authenticateToken, requireRole('ADMIN'), async (req, res) => {
+  try {
+    const { name, address, phone } = req.body;
+    if (!name || !name.trim()) {
+      return res.status(400).json({ error: 'O nome da filial é obrigatório.' });
+    }
+
+    const store = await prisma.store.create({
+      data: {
+        name: name.trim(),
+        address: address?.trim() || null,
+        phone: phone?.trim() || null
+      }
+    });
+
+    io.emit('store:new', store);
+    return res.status(201).json(store);
+  } catch (error) {
+    return res.status(500).json({ error: error.message });
+  }
+});
+
+app.put('/api/stores/:id', authenticateToken, requireRole('ADMIN'), async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { name, address, phone } = req.body;
+
+    const store = await prisma.store.update({
+      where: { id },
+      data: {
+        name: name !== undefined ? name.trim() : undefined,
+        address: address !== undefined ? (address?.trim() || null) : undefined,
+        phone: phone !== undefined ? (phone?.trim() || null) : undefined
+      }
+    });
+
+    io.emit('store:updated', store);
+    return res.json(store);
+  } catch (error) {
+    return res.status(500).json({ error: error.message });
+  }
+});
+
+app.delete('/api/stores/:id', authenticateToken, requireRole('ADMIN'), async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    // Desvincula chats e usuários antes de remover a filial
+    await prisma.chat.updateMany({
+      where: { storeId: id },
+      data: { storeId: null }
+    });
+
+    await prisma.user.updateMany({
+      where: { storeId: id },
+      data: { storeId: null }
+    });
+
+    await prisma.store.delete({
+      where: { id }
+    });
+
+    io.emit('store:deleted', { id });
+    return res.json({ success: true, message: 'Filial removida com sucesso.' });
+  } catch (error) {
+    return res.status(500).json({ error: error.message });
+  }
+});
+
+// --- GESTÃO DE ATENDENTES E OPERADORES (Fase 05) ---
+
+app.get('/api/users', authenticateToken, async (req, res) => {
+  try {
+    const users = await prisma.user.findMany({
+      select: {
+        id: true,
+        email: true,
+        name: true,
+        role: true,
+        isActive: true,
+        storeId: true,
+        store: true,
+        createdAt: true,
+        _count: {
+          select: {
+            assignedChats: true
+          }
+        }
+      },
+      orderBy: { name: 'asc' }
+    });
+    return res.json(users);
+  } catch (error) {
+    return res.status(500).json({ error: error.message });
+  }
+});
+
+app.post('/api/users', authenticateToken, requireRole('ADMIN'), async (req, res) => {
+  try {
+    const { email, password, name, role, storeId } = req.body;
+
+    if (!email || !password || !name) {
+      return res.status(400).json({ error: 'Nome, e-mail e senha são obrigatórios.' });
+    }
+
+    const existing = await prisma.user.findUnique({
+      where: { email: email.toLowerCase().trim() }
+    });
+
+    if (existing) {
+      return res.status(400).json({ error: 'Já existe um operador com este e-mail.' });
+    }
+
+    const passwordHash = await bcrypt.hash(password, 10);
+    const user = await prisma.user.create({
+      data: {
+        email: email.toLowerCase().trim(),
+        passwordHash,
+        name: name.trim(),
+        role: role || 'OPERATOR',
+        storeId: storeId || null,
+        isActive: true
+      },
+      select: {
+        id: true,
+        email: true,
+        name: true,
+        role: true,
+        isActive: true,
+        storeId: true,
+        store: true,
+        createdAt: true
+      }
+    });
+
+    io.emit('user:new', user);
+    return res.status(201).json(user);
+  } catch (error) {
+    return res.status(500).json({ error: error.message });
+  }
+});
+
+app.put('/api/users/:id', authenticateToken, requireRole('ADMIN'), async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { name, role, storeId, isActive, password } = req.body;
+
+    const dataToUpdate = {};
+    if (name !== undefined) dataToUpdate.name = name.trim();
+    if (role !== undefined) dataToUpdate.role = role;
+    if (storeId !== undefined) dataToUpdate.storeId = storeId || null;
+    if (isActive !== undefined) dataToUpdate.isActive = isActive;
+    if (password) {
+      dataToUpdate.passwordHash = await bcrypt.hash(password, 10);
+    }
+
+    const user = await prisma.user.update({
+      where: { id },
+      data: dataToUpdate,
+      select: {
+        id: true,
+        email: true,
+        name: true,
+        role: true,
+        isActive: true,
+        storeId: true,
+        store: true,
+        createdAt: true
+      }
+    });
+
+    io.emit('user:updated', user);
+    return res.json(user);
   } catch (error) {
     return res.status(500).json({ error: error.message });
   }

@@ -6,6 +6,7 @@ backend/.env
 backend/auth_info_baileys/
 backend/prisma/*.db
 backend/prisma/*.db-journal
+backend/prisma/*.db.bak
 backend/public/media/*
 
 # Compiled/Build files

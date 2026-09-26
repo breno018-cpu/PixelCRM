@@ -35,8 +35,13 @@ export const CRMProvider = ({ children }) => {
   const [searchQuery, setSearchQuery] = useState('');
   const [filterFunnelStage, setFilterFunnelStage] = useState('');
   const [filterTag, setFilterTag] = useState('');
+  const [filterStoreId, setFilterStoreId] = useState('');
+  const [filterUserId, setFilterUserId] = useState('');
   const [archivedView, setArchivedView] = useState(false); // true = mostra arquivados, false = mostra normais
   
+  const [stores, setStores] = useState([]);
+  const [users, setUsers] = useState([]);
+
   const [loadingChats, setLoadingChats] = useState(false);
   const [loadingMessages, setLoadingMessages] = useState(false);
   const [loadingMoreMessages, setLoadingMoreMessages] = useState(false);
@@ -53,6 +58,8 @@ export const CRMProvider = ({ children }) => {
       if (searchQuery) params.append('search', searchQuery);
       if (filterFunnelStage) params.append('funnelStage', filterFunnelStage);
       if (filterTag) params.append('tag', filterTag);
+      if (filterStoreId) params.append('storeId', filterStoreId);
+      if (filterUserId) params.append('assignedUserId', filterUserId);
       if (archivedView) {
         params.append('archived', 'true');
       } else {
@@ -69,7 +76,7 @@ export const CRMProvider = ({ children }) => {
     } finally {
       setLoadingChats(false);
     }
-  }, [backendUrl, searchQuery, filterFunnelStage, filterTag, archivedView]);
+  }, [backendUrl, searchQuery, filterFunnelStage, filterTag, filterStoreId, filterUserId, archivedView]);
 
   // Busca o histórico de mensagens de um chat
   const fetchMessages = useCallback(async (chatId) => {
@@ -311,6 +318,159 @@ export const CRMProvider = ({ children }) => {
     }
   };
 
+  // Busca a lista de filiais/lojas
+  const fetchStores = useCallback(async () => {
+    try {
+      const response = await authFetch(`${backendUrl}/api/stores`);
+      if (response.ok) {
+        const data = await response.json();
+        setStores(data);
+      }
+    } catch (e) {
+      console.error('[CRM] Erro ao buscar filiais:', e);
+    }
+  }, [backendUrl]);
+
+  // Busca a lista de usuários/atendentes
+  const fetchUsers = useCallback(async () => {
+    try {
+      const response = await authFetch(`${backendUrl}/api/users`);
+      if (response.ok) {
+        const data = await response.json();
+        setUsers(data);
+      }
+    } catch (e) {
+      console.error('[CRM] Erro ao buscar usuários:', e);
+    }
+  }, [backendUrl]);
+
+  // Carrega filiais e usuários ao montar
+  useEffect(() => {
+    fetchStores();
+    fetchUsers();
+  }, [fetchStores, fetchUsers]);
+
+  // Criar nova filial
+  const createStore = async (storeData) => {
+    try {
+      const response = await authFetch(`${backendUrl}/api/stores`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(storeData)
+      });
+      if (response.ok) {
+        const created = await response.json();
+        setStores(prev => [...prev, created]);
+        return { success: true, store: created };
+      }
+      const err = await response.json();
+      return { success: false, error: err.error };
+    } catch (e) {
+      return { success: false, error: e.message };
+    }
+  };
+
+  // Atualizar filial
+  const updateStore = async (id, storeData) => {
+    try {
+      const response = await authFetch(`${backendUrl}/api/stores/${id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(storeData)
+      });
+      if (response.ok) {
+        const updated = await response.json();
+        setStores(prev => prev.map(s => s.id === id ? updated : s));
+        return { success: true, store: updated };
+      }
+      const err = await response.json();
+      return { success: false, error: err.error };
+    } catch (e) {
+      return { success: false, error: e.message };
+    }
+  };
+
+  // Deletar filial
+  const deleteStore = async (id) => {
+    try {
+      const response = await authFetch(`${backendUrl}/api/stores/${id}`, {
+        method: 'DELETE'
+      });
+      if (response.ok) {
+        setStores(prev => prev.filter(s => s.id !== id));
+        return { success: true };
+      }
+      const err = await response.json();
+      return { success: false, error: err.error };
+    } catch (e) {
+      return { success: false, error: e.message };
+    }
+  };
+
+  // Criar novo atendente / usuário
+  const createUser = async (userData) => {
+    try {
+      const response = await authFetch(`${backendUrl}/api/users`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(userData)
+      });
+      if (response.ok) {
+        const created = await response.json();
+        setUsers(prev => [...prev, created]);
+        return { success: true, user: created };
+      }
+      const err = await response.json();
+      return { success: false, error: err.error };
+    } catch (e) {
+      return { success: false, error: e.message };
+    }
+  };
+
+  // Atualizar usuário
+  const updateUser = async (id, userData) => {
+    try {
+      const response = await authFetch(`${backendUrl}/api/users/${id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(userData)
+      });
+      if (response.ok) {
+        const updated = await response.json();
+        setUsers(prev => prev.map(u => u.id === id ? updated : u));
+        return { success: true, user: updated };
+      }
+      const err = await response.json();
+      return { success: false, error: err.error };
+    } catch (e) {
+      return { success: false, error: e.message };
+    }
+  };
+
+  // Atribuir conversa a uma filial e/ou atendente
+  const assignChat = async (chatId, { storeId, assignedUserId }) => {
+    try {
+      const response = await authFetch(`${backendUrl}/api/chats/${chatId}/assign`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ storeId, assignedUserId })
+      });
+      if (response.ok) {
+        const updatedChat = await response.json();
+        setChats(prev => prev.map(c => c.id === chatId ? { ...c, ...updatedChat } : c));
+        if (activeChat && activeChat.id === chatId) {
+          setActiveChat(prev => ({ ...prev, ...updatedChat }));
+        }
+        return { success: true, chat: updatedChat };
+      }
+      const err = await response.json();
+      return { success: false, error: err.error };
+    } catch (e) {
+      console.error('[CRM] Erro ao atribuir chat:', e);
+      return { success: false, error: e.message };
+    }
+  };
+
   return (
     <CRMContext.Provider value={{
       chats,
@@ -322,6 +482,20 @@ export const CRMProvider = ({ children }) => {
       setFilterFunnelStage,
       filterTag,
       setFilterTag,
+      filterStoreId,
+      setFilterStoreId,
+      filterUserId,
+      setFilterUserId,
+      stores,
+      users,
+      fetchStores,
+      fetchUsers,
+      createStore,
+      updateStore,
+      deleteStore,
+      createUser,
+      updateUser,
+      assignChat,
       archivedView,
       setArchivedView,
       loadingChats,

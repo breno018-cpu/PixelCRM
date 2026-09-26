@@ -7,6 +7,17 @@ generator client {
   provider = "prisma-client-js"
 }
 
+model Store {
+  id        String   @id @default(uuid())
+  name      String
+  address   String?
+  phone     String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  users     User[]
+  chats     Chat[]
+}
+
 model Chat {
   id              String    @id // JID do WhatsApp (ex: 5511999999999@s.whatsapp.net)
   name            String?   // Nome salvo ou editado
@@ -20,9 +31,19 @@ model Chat {
   notes           String    @default("")     // Notas de CRM internas
   avatarUrl       String?   // URL do avatar do contato no WhatsApp
   isArchived      Boolean   @default(false)  // Se a conversa está arquivada no WhatsApp
+  
+  storeId         String?
+  store           Store?    @relation(fields: [storeId], references: [id], onDelete: SetNull)
+
+  assignedUserId  String?
+  assignedUser    User?     @relation(fields: [assignedUserId], references: [id], onDelete: SetNull)
+
   createdAt       DateTime  @default(now())
   updatedAt       DateTime  @updatedAt
   messages        Message[]
+
+  @@index([storeId])
+  @@index([assignedUserId])
 }
 
 model Message {
@@ -48,7 +69,14 @@ model User {
   name         String
   role         String    @default("OPERATOR") // ADMIN, MANAGER, OPERATOR
   isActive     Boolean   @default(true)
+  
+  storeId      String?
+  store        Store?    @relation(fields: [storeId], references: [id], onDelete: SetNull)
+
+  assignedChats Chat[]
+
   createdAt    DateTime  @default(now())
   updatedAt    DateTime  @updatedAt
-}
 
+  @@index([storeId])
+}

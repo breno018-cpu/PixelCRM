@@ -9,7 +9,8 @@ import {
   LogOut, ShieldAlert, MessageCircle, HelpCircle, Archive, FolderArchive,
   FolderOpen, ArrowLeft, Sparkles, Cpu, Bot, Sliders, Play, GitFork, Lock,
   Globe, Database, Key, ShoppingBag, Layers, Percent, FileCheck, FileCode, SendHorizontal, Activity,
-  Pause, Mic, Download, ChevronUp, ChevronDown, File
+  Pause, Mic, Download, ChevronUp, ChevronDown, File,
+  Building2, Building, UserCheck, UserPlus, ShieldCheck, MapPin
 } from 'lucide-react';
 
 // LOGO CUSTOMIZADA DA PIXEL LOOM (Intersecção de linhas e tecelagem de pixels)
@@ -240,6 +241,20 @@ export default function CRMInterface({ onGoToConnect, qrToken }) {
     setFilterFunnelStage,
     filterTag,
     setFilterTag,
+    filterStoreId,
+    setFilterStoreId,
+    filterUserId,
+    setFilterUserId,
+    stores,
+    users,
+    fetchStores,
+    fetchUsers,
+    createStore,
+    updateStore,
+    deleteStore,
+    createUser,
+    updateUser,
+    assignChat,
     archivedView,
     setArchivedView,
     loadingChats,
@@ -256,11 +271,29 @@ export default function CRMInterface({ onGoToConnect, qrToken }) {
 
   // Autenticação Real com JWT (Fase 01 - Segurança)
   const [isLoggedIn, setIsLoggedIn] = useState(() => !!localStorage.getItem('crm_token'));
+  const [currentUser, setCurrentUser] = useState(() => {
+    try {
+      const raw = localStorage.getItem('crm_user');
+      return raw ? JSON.parse(raw) : null;
+    } catch {
+      return null;
+    }
+  });
   const [emailInput, setEmailInput] = useState('');
   const [passwordInput, setPasswordInput] = useState('');
   const [loginError, setLoginError] = useState('');
   const [isLoggingIn, setIsLoggingIn] = useState(false);
   const [showDisconnectConfirm, setShowDisconnectConfirm] = useState(false);
+
+  // Gestão de Filiais e Equipe (Fase 05 - Multi-usuário Real)
+  const [showTeamModal, setShowTeamModal] = useState(false);
+  const [teamTab, setTeamTab] = useState('stores'); // 'stores' | 'users'
+  const [showStoreForm, setShowStoreForm] = useState(false);
+  const [storeForm, setStoreForm] = useState({ id: null, name: '', address: '', phone: '' });
+  const [showUserForm, setShowUserForm] = useState(false);
+  const [userForm, setUserForm] = useState({ id: null, name: '', email: '', password: '', role: 'OPERATOR', storeId: '', active: true });
+  const [teamLoading, setTeamLoading] = useState(false);
+  const [teamMsg, setTeamMsg] = useState({ type: '', text: '' });
 
   const [activeTab, setActiveTab] = useState('chats'); // 'chats' | 'dashboard' | 'automations'
   const [messageInput, setMessageInput] = useState('');
@@ -445,6 +478,7 @@ export default function CRMInterface({ onGoToConnect, qrToken }) {
       localStorage.setItem('crm_token', data.token);
       localStorage.setItem('crm_user', JSON.stringify(data.user));
       sessionStorage.setItem('crm_session', 'authenticated');
+      setCurrentUser(data.user);
       setIsLoggedIn(true);
     } catch (err) {
       setLoginError(err.message || 'Erro ao comunicar com o servidor de autenticação.');
@@ -474,6 +508,7 @@ export default function CRMInterface({ onGoToConnect, qrToken }) {
     localStorage.removeItem('crm_token');
     localStorage.removeItem('crm_user');
     sessionStorage.removeItem('crm_session');
+    setCurrentUser(null);
     setIsLoggedIn(false);
     setIsBooted(false);
     setBootProgress(0);
@@ -784,6 +819,20 @@ export default function CRMInterface({ onGoToConnect, qrToken }) {
             >
               <FolderArchive size={22} />
             </button>
+
+            {/* Gestão de Filiais e Atendentes */}
+            <button
+              onClick={() => {
+                setTeamMsg({ type: '', text: '' });
+                setShowStoreForm(false);
+                setShowUserForm(false);
+                setShowTeamModal(true);
+              }}
+              className="w-11 h-11 rounded-full flex items-center justify-center transition-all relative text-[#54656f] hover:bg-[#eae6df] hover:text-[#00a884]"
+              title="Gestão de Filiais e Atendentes"
+            >
+              <Building2 size={22} />
+            </button>
           </nav>
         </div>
 
@@ -928,6 +977,40 @@ export default function CRMInterface({ onGoToConnect, qrToken }) {
               })}
             </div>
 
+            {/* Filtros de Filial e Atendente (Multi-usuário Real) */}
+            <div className="px-3 py-1.5 bg-[#f8f9fa] border-b border-[#e9edef] flex items-center gap-2 shrink-0">
+              <div className="flex-1">
+                <select
+                  value={filterStoreId}
+                  onChange={(e) => setFilterStoreId(e.target.value)}
+                  className="w-full text-[10px] bg-white text-[#111b21] border border-[#e9edef] rounded-md px-2 py-1 font-medium focus:outline-none focus:ring-1 focus:ring-[#00a884]"
+                  title="Filtrar por Filial"
+                >
+                  <option value="">Todas as Filiais ({stores.length})</option>
+                  {stores.map(store => (
+                    <option key={store.id} value={store.id}>{store.name}</option>
+                  ))}
+                </select>
+              </div>
+              <div className="flex-1">
+                <select
+                  value={filterUserId}
+                  onChange={(e) => setFilterUserId(e.target.value)}
+                  className="w-full text-[10px] bg-white text-[#111b21] border border-[#e9edef] rounded-md px-2 py-1 font-medium focus:outline-none focus:ring-1 focus:ring-[#00a884]"
+                  title="Filtrar por Atendente"
+                >
+                  <option value="">Todos Atendentes</option>
+                  <option value="unassigned">Não Atribuídos</option>
+                  {currentUser && (
+                    <option value={currentUser.id}>Meus ({currentUser.name ? currentUser.name.split(' ')[0] : 'Eu'})</option>
+                  )}
+                  {users.filter(u => !currentUser || u.id !== currentUser.id).map(user => (
+                    <option key={user.id} value={user.id}>{user.name || user.email}</option>
+                  ))}
+                </select>
+              </div>
+            </div>
+
             {/* Lista de Contatos */}
             <div className="flex-1 overflow-y-auto divide-y divide-[#e9edef] bg-white">
               {loadingChats ? (
@@ -1008,6 +1091,26 @@ export default function CRMInterface({ onGoToConnect, qrToken }) {
                                 </span>
                               )}
                             </div>
+                          </div>
+
+                          {/* Badges de Filial e Atendente */}
+                          <div className="flex items-center gap-1.5 mt-1 text-[9px] text-[#667781]">
+                            {chat.store && (
+                              <span className="inline-flex items-center gap-0.5 bg-slate-100 text-slate-600 px-1.5 py-0.5 rounded text-[8.5px] font-medium border border-slate-200/50">
+                                <Building size={9} className="text-slate-400" />
+                                <span className="truncate max-w-[90px]">{chat.store.name}</span>
+                              </span>
+                            )}
+                            {chat.assignedUser ? (
+                              <span className="inline-flex items-center gap-0.5 bg-emerald-50 text-emerald-700 px-1.5 py-0.5 rounded text-[8.5px] font-medium border border-emerald-200/50">
+                                <UserCheck size={9} className="text-emerald-500" />
+                                <span className="truncate max-w-[90px]">{chat.assignedUser.name || chat.assignedUser.email}</span>
+                              </span>
+                            ) : (
+                              <span className="inline-flex items-center gap-0.5 bg-amber-50 text-amber-600 px-1.5 py-0.5 rounded text-[8.5px] font-normal border border-amber-200/40 italic">
+                                Não atribuído
+                              </span>
+                            )}
                           </div>
                         </div>
                       </div>
@@ -1582,6 +1685,48 @@ export default function CRMInterface({ onGoToConnect, qrToken }) {
                   </div>
                 </div>
 
+                {/* Filial / Unidade */}
+                <div className="space-y-1.5">
+                  <label className="text-[9px] font-bold text-slate-500 tracking-widest uppercase flex items-center gap-2">
+                    <Building size={14} className="text-[#00a884]" />
+                    Filial / Unidade
+                  </label>
+                  <select
+                    value={activeChat.storeId || ''}
+                    onChange={async (e) => {
+                      const newStoreId = e.target.value || null;
+                      await assignChat(activeChat.id, { storeId: newStoreId, assignedUserId: activeChat.assignedUserId });
+                    }}
+                    className="w-full bg-[#f0f2f5] border border-[#e9edef] rounded-lg px-2.5 py-2 text-xs text-[#111b21] font-semibold focus:outline-none focus:ring-1 focus:ring-[#00a884]/40 cursor-pointer"
+                  >
+                    <option value="">Sem Filial Atribuída</option>
+                    {stores.map(s => (
+                      <option key={s.id} value={s.id}>{s.name}</option>
+                    ))}
+                  </select>
+                </div>
+
+                {/* Atendente Responsável */}
+                <div className="space-y-1.5">
+                  <label className="text-[9px] font-bold text-slate-500 tracking-widest uppercase flex items-center gap-2">
+                    <UserCheck size={14} className="text-[#00a884]" />
+                    Atendente Responsável
+                  </label>
+                  <select
+                    value={activeChat.assignedUserId || ''}
+                    onChange={async (e) => {
+                      const newUserId = e.target.value || null;
+                      await assignChat(activeChat.id, { storeId: activeChat.storeId, assignedUserId: newUserId });
+                    }}
+                    className="w-full bg-[#f0f2f5] border border-[#e9edef] rounded-lg px-2.5 py-2 text-xs text-[#111b21] font-semibold focus:outline-none focus:ring-1 focus:ring-[#00a884]/40 cursor-pointer"
+                  >
+                    <option value="">Não Atribuído (Nenhum)</option>
+                    {users.map(u => (
+                      <option key={u.id} value={u.id}>{u.name || u.email} ({u.role === 'ADMIN' ? 'Admin' : 'Operador'})</option>
+                    ))}
+                  </select>
+                </div>
+
                 <div className="space-y-3">
                   <label className="text-[9px] font-bold text-slate-500 tracking-widest uppercase flex items-center gap-2">
                     <Tags size={14} className="text-[#00a884]" />
@@ -1939,6 +2084,540 @@ export default function CRMInterface({ onGoToConnect, qrToken }) {
             <div className="mt-4 bg-[#202c33] border border-[#222e35] rounded-xl px-4 py-2 text-xs font-semibold text-slate-300">
               Visualizador de Mídias Shineray CRM
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL 4: GESTÃO DE FILIAIS E EQUIPE DE ATENDIMENTO (Fase 05 - Multi-usuário Real) */}
+      {showTeamModal && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-fade-in">
+          <div className="bg-white border border-[#e9edef] rounded-2xl w-full max-w-2xl max-h-[88vh] overflow-hidden flex flex-col shadow-2xl text-[#111b21]">
+            
+            {/* Header */}
+            <div className="bg-[#f0f2f5] p-4 flex items-center justify-between border-b border-[#e9edef] shrink-0">
+              <div className="flex items-center gap-2.5">
+                <div className="w-8 h-8 rounded-lg bg-[#00a884]/10 text-[#00a884] flex items-center justify-center">
+                  <Building2 size={18} />
+                </div>
+                <div>
+                  <h3 className="text-xs font-bold uppercase tracking-wider text-slate-700">Gestão de Filiais & Equipe</h3>
+                  <p className="text-[10px] text-[#667781]">Configuração multi-loja e permissões de atendentes</p>
+                </div>
+              </div>
+              <div className="flex items-center gap-2">
+                {currentUser?.role === 'ADMIN' ? (
+                  <span className="bg-purple-100 text-purple-700 text-[10px] font-bold px-2 py-0.5 rounded-full border border-purple-200">
+                    Administrador
+                  </span>
+                ) : (
+                  <span className="bg-sky-100 text-sky-700 text-[10px] font-bold px-2 py-0.5 rounded-full border border-sky-200">
+                    Operador
+                  </span>
+                )}
+                <button 
+                  onClick={() => setShowTeamModal(false)}
+                  className="p-1.5 hover:bg-slate-200 rounded-full text-slate-500 hover:text-black transition-colors"
+                  title="Fechar"
+                >
+                  <X size={18} />
+                </button>
+              </div>
+            </div>
+
+            {/* Abas */}
+            <div className="flex border-b border-[#e9edef] bg-white px-4 shrink-0">
+              <button
+                onClick={() => {
+                  setTeamTab('stores');
+                  setShowStoreForm(false);
+                  setTeamMsg({ type: '', text: '' });
+                }}
+                className={`py-3 px-4 text-xs font-bold border-b-2 flex items-center gap-2 transition-all ${
+                  teamTab === 'stores'
+                    ? 'border-[#00a884] text-[#00a884]'
+                    : 'border-transparent text-[#667781] hover:text-[#111b21]'
+                }`}
+              >
+                <Building size={15} />
+                <span>Filiais & Lojas ({stores.length})</span>
+              </button>
+              <button
+                onClick={() => {
+                  setTeamTab('users');
+                  setShowUserForm(false);
+                  setTeamMsg({ type: '', text: '' });
+                }}
+                className={`py-3 px-4 text-xs font-bold border-b-2 flex items-center gap-2 transition-all ${
+                  teamTab === 'users'
+                    ? 'border-[#00a884] text-[#00a884]'
+                    : 'border-transparent text-[#667781] hover:text-[#111b21]'
+                }`}
+              >
+                <Users size={15} />
+                <span>Atendentes & Equipe ({users.length})</span>
+              </button>
+            </div>
+
+            {/* Mensagem de Feedback */}
+            {teamMsg.text && (
+              <div className={`mx-6 mt-4 p-2.5 rounded-lg text-xs font-medium flex items-center justify-between ${
+                teamMsg.type === 'error' ? 'bg-rose-50 text-rose-700 border border-rose-200' : 'bg-emerald-50 text-emerald-700 border border-emerald-200'
+              }`}>
+                <span>{teamMsg.text}</span>
+                <button onClick={() => setTeamMsg({ type: '', text: '' })} className="text-slate-400 hover:text-black">
+                  <X size={13} />
+                </button>
+              </div>
+            )}
+
+            {/* Conteúdo das Abas */}
+            <div className="p-6 overflow-y-auto flex-1 bg-[#f8f9fa] space-y-4">
+
+              {/* ABA 1: FILIAIS */}
+              {teamTab === 'stores' && (
+                <div>
+                  {showStoreForm ? (
+                    <div className="bg-white p-5 rounded-xl border border-[#e9edef] shadow-sm space-y-4">
+                      <div className="flex justify-between items-center pb-2 border-b border-[#e9edef]">
+                        <h4 className="text-xs font-bold text-slate-800 uppercase tracking-wide">
+                          {storeForm.id ? 'Editar Filial' : 'Cadastrar Nova Filial'}
+                        </h4>
+                        <button 
+                          onClick={() => setShowStoreForm(false)}
+                          className="text-slate-400 hover:text-black text-xs font-semibold"
+                        >
+                          Cancelar
+                        </button>
+                      </div>
+
+                      <div className="space-y-3">
+                        <div>
+                          <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block mb-1">
+                            Nome da Unidade *
+                          </label>
+                          <input
+                            type="text"
+                            placeholder="Ex: Shineray Matriz, Filial Zona Sul..."
+                            value={storeForm.name}
+                            onChange={(e) => setStoreForm(prev => ({ ...prev, name: e.target.value }))}
+                            className="w-full bg-[#f0f2f5] border border-[#e9edef] rounded-lg px-3 py-2 text-xs text-[#111b21] focus:outline-none focus:ring-1 focus:ring-[#00a884]"
+                          />
+                        </div>
+
+                        <div>
+                          <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block mb-1">
+                            Endereço / Localização
+                          </label>
+                          <input
+                            type="text"
+                            placeholder="Ex: Av. Principal, 1000 - Centro"
+                            value={storeForm.address}
+                            onChange={(e) => setStoreForm(prev => ({ ...prev, address: e.target.value }))}
+                            className="w-full bg-[#f0f2f5] border border-[#e9edef] rounded-lg px-3 py-2 text-xs text-[#111b21] focus:outline-none focus:ring-1 focus:ring-[#00a884]"
+                          />
+                        </div>
+
+                        <div>
+                          <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block mb-1">
+                            Telefone / WhatsApp da Loja
+                          </label>
+                          <input
+                            type="text"
+                            placeholder="Ex: (81) 98888-7777"
+                            value={storeForm.phone}
+                            onChange={(e) => setStoreForm(prev => ({ ...prev, phone: e.target.value }))}
+                            className="w-full bg-[#f0f2f5] border border-[#e9edef] rounded-lg px-3 py-2 text-xs text-[#111b21] focus:outline-none focus:ring-1 focus:ring-[#00a884]"
+                          />
+                        </div>
+                      </div>
+
+                      <div className="flex justify-end gap-2 pt-2">
+                        <button
+                          onClick={() => setShowStoreForm(false)}
+                          className="px-4 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-lg text-xs font-semibold"
+                        >
+                          Cancelar
+                        </button>
+                        <button
+                          disabled={teamLoading || !storeForm.name.trim()}
+                          onClick={async () => {
+                            setTeamLoading(true);
+                            setTeamMsg({ type: '', text: '' });
+                            if (storeForm.id) {
+                              const res = await updateStore(storeForm.id, { name: storeForm.name, address: storeForm.address, phone: storeForm.phone });
+                              if (res.success) {
+                                setTeamMsg({ type: 'success', text: 'Filial atualizada com sucesso!' });
+                                setShowStoreForm(false);
+                              } else {
+                                setTeamMsg({ type: 'error', text: res.error || 'Erro ao atualizar filial' });
+                              }
+                            } else {
+                              const res = await createStore({ name: storeForm.name, address: storeForm.address, phone: storeForm.phone });
+                              if (res.success) {
+                                setTeamMsg({ type: 'success', text: 'Filial criada com sucesso!' });
+                                setShowStoreForm(false);
+                              } else {
+                                setTeamMsg({ type: 'error', text: res.error || 'Erro ao criar filial' });
+                              }
+                            }
+                            setTeamLoading(false);
+                          }}
+                          className="px-5 py-1.5 bg-[#00a884] hover:bg-emerald-600 text-white rounded-lg text-xs font-bold disabled:opacity-50 flex items-center gap-1.5 shadow-sm"
+                        >
+                          {teamLoading && <Loader2 size={13} className="animate-spin" />}
+                          Salvar Filial
+                        </button>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="space-y-3">
+                      <div className="flex justify-between items-center">
+                        <p className="text-xs text-slate-500">
+                          Filiais ativas onde as conversas e leads podem ser distribuídos.
+                        </p>
+                        {currentUser?.role === 'ADMIN' && (
+                          <button
+                            onClick={() => {
+                              setStoreForm({ id: null, name: '', address: '', phone: '' });
+                              setShowStoreForm(true);
+                            }}
+                            className="px-3 py-1.5 bg-[#00a884] hover:bg-emerald-600 text-white text-xs font-bold rounded-lg flex items-center gap-1.5 shadow-sm transition-all"
+                          >
+                            <Plus size={14} />
+                            Nova Filial
+                          </button>
+                        )}
+                      </div>
+
+                      <div className="grid grid-cols-1 gap-2.5">
+                        {stores.map((store) => {
+                          const chatCount = chats.filter(c => c.storeId === store.id).length;
+                          const userCount = users.filter(u => u.storeId === store.id).length;
+
+                          return (
+                            <div 
+                              key={store.id}
+                              className="bg-white p-4 rounded-xl border border-[#e9edef] shadow-sm flex items-center justify-between"
+                            >
+                              <div className="space-y-1">
+                                <div className="flex items-center gap-2">
+                                  <Building size={16} className="text-[#00a884]" />
+                                  <h4 className="text-xs font-bold text-[#111b21]">{store.name}</h4>
+                                </div>
+                                {store.address && (
+                                  <p className="text-[11px] text-slate-500 flex items-center gap-1">
+                                    <MapPin size={11} className="text-slate-400" />
+                                    {store.address}
+                                  </p>
+                                )}
+                                {store.phone && (
+                                  <p className="text-[11px] text-slate-500 flex items-center gap-1">
+                                    <Phone size={11} className="text-slate-400" />
+                                    {store.phone}
+                                  </p>
+                                )}
+                                <div className="flex items-center gap-2 pt-1">
+                                  <span className="text-[9px] bg-slate-100 text-slate-600 px-2 py-0.5 rounded font-semibold">
+                                    {chatCount} {chatCount === 1 ? 'conversa' : 'conversas'}
+                                  </span>
+                                  <span className="text-[9px] bg-sky-50 text-sky-700 px-2 py-0.5 rounded font-semibold">
+                                    {userCount} {userCount === 1 ? 'atendente' : 'atendentes'}
+                                  </span>
+                                </div>
+                              </div>
+
+                              {currentUser?.role === 'ADMIN' && (
+                                <div className="flex items-center gap-1.5">
+                                  <button
+                                    onClick={() => {
+                                      setStoreForm({ id: store.id, name: store.name, address: store.address || '', phone: store.phone || '' });
+                                      setShowStoreForm(true);
+                                    }}
+                                    className="p-1.5 text-slate-500 hover:text-[#00a884] hover:bg-slate-100 rounded-lg transition-colors"
+                                    title="Editar Filial"
+                                  >
+                                    <Edit2 size={14} />
+                                  </button>
+                                  <button
+                                    onClick={async () => {
+                                      if (window.confirm(`Deseja excluir a filial "${store.name}"? Conversas vinculadas perderão o vínculo com esta loja.`)) {
+                                        setTeamLoading(true);
+                                        const res = await deleteStore(store.id);
+                                        if (res.success) {
+                                          setTeamMsg({ type: 'success', text: 'Filial excluída com sucesso!' });
+                                        } else {
+                                          setTeamMsg({ type: 'error', text: res.error || 'Erro ao excluir filial' });
+                                        }
+                                        setTeamLoading(false);
+                                      }
+                                    }}
+                                    className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors"
+                                    title="Excluir Filial"
+                                  >
+                                    <X size={15} />
+                                  </button>
+                                </div>
+                              )}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* ABA 2: ATENDENTES & EQUIPE */}
+              {teamTab === 'users' && (
+                <div>
+                  {showUserForm ? (
+                    <div className="bg-white p-5 rounded-xl border border-[#e9edef] shadow-sm space-y-4">
+                      <div className="flex justify-between items-center pb-2 border-b border-[#e9edef]">
+                        <h4 className="text-xs font-bold text-slate-800 uppercase tracking-wide">
+                          {userForm.id ? 'Editar Atendente' : 'Cadastrar Novo Atendente'}
+                        </h4>
+                        <button 
+                          onClick={() => setShowUserForm(false)}
+                          className="text-slate-400 hover:text-black text-xs font-semibold"
+                        >
+                          Cancelar
+                        </button>
+                      </div>
+
+                      <div className="space-y-3">
+                        <div>
+                          <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block mb-1">
+                            Nome Completo *
+                          </label>
+                          <input
+                            type="text"
+                            placeholder="Ex: João da Silva"
+                            value={userForm.name}
+                            onChange={(e) => setUserForm(prev => ({ ...prev, name: e.target.value }))}
+                            className="w-full bg-[#f0f2f5] border border-[#e9edef] rounded-lg px-3 py-2 text-xs text-[#111b21] focus:outline-none focus:ring-1 focus:ring-[#00a884]"
+                          />
+                        </div>
+
+                        <div>
+                          <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block mb-1">
+                            Email de Acesso *
+                          </label>
+                          <input
+                            type="email"
+                            placeholder="Ex: operador@shineray.com"
+                            value={userForm.email}
+                            onChange={(e) => setUserForm(prev => ({ ...prev, email: e.target.value }))}
+                            className="w-full bg-[#f0f2f5] border border-[#e9edef] rounded-lg px-3 py-2 text-xs text-[#111b21] focus:outline-none focus:ring-1 focus:ring-[#00a884]"
+                          />
+                        </div>
+
+                        <div>
+                          <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block mb-1">
+                            Senha {userForm.id ? '(deixe em branco para não alterar)' : '*'}
+                          </label>
+                          <input
+                            type="password"
+                            placeholder={userForm.id ? 'Nova senha (opcional)' : 'Senha de acesso (mínimo 6 caracteres)'}
+                            value={userForm.password}
+                            onChange={(e) => setUserForm(prev => ({ ...prev, password: e.target.value }))}
+                            className="w-full bg-[#f0f2f5] border border-[#e9edef] rounded-lg px-3 py-2 text-xs text-[#111b21] focus:outline-none focus:ring-1 focus:ring-[#00a884]"
+                          />
+                        </div>
+
+                        <div className="grid grid-cols-2 gap-3">
+                          <div>
+                            <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block mb-1">
+                              Nível de Acesso
+                            </label>
+                            <select
+                              value={userForm.role}
+                              onChange={(e) => setUserForm(prev => ({ ...prev, role: e.target.value }))}
+                              className="w-full bg-[#f0f2f5] border border-[#e9edef] rounded-lg px-3 py-2 text-xs text-[#111b21] focus:outline-none focus:ring-1 focus:ring-[#00a884]"
+                            >
+                              <option value="OPERATOR">Operador</option>
+                              <option value="ADMIN">Administrador</option>
+                            </select>
+                          </div>
+
+                          <div>
+                            <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block mb-1">
+                              Filial Vinculada
+                            </label>
+                            <select
+                              value={userForm.storeId || ''}
+                              onChange={(e) => setUserForm(prev => ({ ...prev, storeId: e.target.value }))}
+                              className="w-full bg-[#f0f2f5] border border-[#e9edef] rounded-lg px-3 py-2 text-xs text-[#111b21] focus:outline-none focus:ring-1 focus:ring-[#00a884]"
+                            >
+                              <option value="">Sem filial vinculada</option>
+                              {stores.map(s => (
+                                <option key={s.id} value={s.id}>{s.name}</option>
+                              ))}
+                            </select>
+                          </div>
+                        </div>
+
+                        {userForm.id && (
+                          <div className="flex items-center gap-2 pt-1">
+                            <input
+                              type="checkbox"
+                              id="user-active-checkbox"
+                              checked={userForm.active}
+                              onChange={(e) => setUserForm(prev => ({ ...prev, active: e.target.checked }))}
+                              className="rounded text-[#00a884] focus:ring-[#00a884]"
+                            />
+                            <label htmlFor="user-active-checkbox" className="text-xs font-semibold text-slate-700">
+                              Usuário Ativo (pode fazer login no CRM)
+                            </label>
+                          </div>
+                        )}
+                      </div>
+
+                      <div className="flex justify-end gap-2 pt-2">
+                        <button
+                          onClick={() => setShowUserForm(false)}
+                          className="px-4 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-lg text-xs font-semibold"
+                        >
+                          Cancelar
+                        </button>
+                        <button
+                          disabled={teamLoading || !userForm.name.trim() || !userForm.email.trim() || (!userForm.id && !userForm.password)}
+                          onClick={async () => {
+                            setTeamLoading(true);
+                            setTeamMsg({ type: '', text: '' });
+                            if (userForm.id) {
+                              const payload = {
+                                name: userForm.name,
+                                email: userForm.email,
+                                role: userForm.role,
+                                storeId: userForm.storeId || null,
+                                active: userForm.active
+                              };
+                              if (userForm.password) payload.password = userForm.password;
+                              const res = await updateUser(userForm.id, payload);
+                              if (res.success) {
+                                setTeamMsg({ type: 'success', text: 'Atendente atualizado com sucesso!' });
+                                setShowUserForm(false);
+                              } else {
+                                setTeamMsg({ type: 'error', text: res.error || 'Erro ao atualizar atendente' });
+                              }
+                            } else {
+                              const res = await createUser({
+                                name: userForm.name,
+                                email: userForm.email,
+                                password: userForm.password,
+                                role: userForm.role,
+                                storeId: userForm.storeId || null
+                              });
+                              if (res.success) {
+                                setTeamMsg({ type: 'success', text: 'Atendente criado com sucesso!' });
+                                setShowUserForm(false);
+                              } else {
+                                setTeamMsg({ type: 'error', text: res.error || 'Erro ao criar atendente' });
+                              }
+                            }
+                            setTeamLoading(false);
+                          }}
+                          className="px-5 py-1.5 bg-[#00a884] hover:bg-emerald-600 text-white rounded-lg text-xs font-bold disabled:opacity-50 flex items-center gap-1.5 shadow-sm"
+                        >
+                          {teamLoading && <Loader2 size={13} className="animate-spin" />}
+                          Salvar Atendente
+                        </button>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="space-y-3">
+                      <div className="flex justify-between items-center">
+                        <p className="text-xs text-slate-500">
+                          Membros da equipe que podem atender conversas e gerenciar o CRM.
+                        </p>
+                        {currentUser?.role === 'ADMIN' && (
+                          <button
+                            onClick={() => {
+                              setUserForm({ id: null, name: '', email: '', password: '', role: 'OPERATOR', storeId: stores[0]?.id || '', active: true });
+                              setShowUserForm(true);
+                            }}
+                            className="px-3 py-1.5 bg-[#00a884] hover:bg-emerald-600 text-white text-xs font-bold rounded-lg flex items-center gap-1.5 shadow-sm transition-all"
+                          >
+                            <UserPlus size={14} />
+                            Novo Atendente
+                          </button>
+                        )}
+                      </div>
+
+                      <div className="grid grid-cols-1 gap-2.5">
+                        {users.map((user) => {
+                          const assignedChatsCount = chats.filter(c => c.assignedUserId === user.id).length;
+                          const userStore = stores.find(s => s.id === user.storeId);
+
+                          return (
+                            <div 
+                              key={user.id}
+                              className="bg-white p-4 rounded-xl border border-[#e9edef] shadow-sm flex items-center justify-between"
+                            >
+                              <div className="flex items-center gap-3">
+                                <div className="w-10 h-10 rounded-full bg-slate-200 text-slate-600 flex items-center justify-center font-bold text-sm">
+                                  {user.name ? user.name.charAt(0).toUpperCase() : <User size={18} />}
+                                </div>
+                                <div className="space-y-0.5">
+                                  <div className="flex items-center gap-2">
+                                    <h4 className="text-xs font-bold text-[#111b21]">{user.name}</h4>
+                                    <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded-full ${
+                                      user.role === 'ADMIN' ? 'bg-purple-100 text-purple-700 border border-purple-200' : 'bg-sky-100 text-sky-700 border border-sky-200'
+                                    }`}>
+                                      {user.role === 'ADMIN' ? 'Admin' : 'Operador'}
+                                    </span>
+                                    {user.active === false && (
+                                      <span className="text-[9px] bg-rose-100 text-rose-700 px-1.5 py-0.5 rounded font-semibold">
+                                        Inativo
+                                      </span>
+                                    )}
+                                  </div>
+                                  <p className="text-[11px] text-slate-500">{user.email}</p>
+                                  <div className="flex items-center gap-2 pt-1">
+                                    {userStore && (
+                                      <span className="text-[9px] bg-slate-100 text-slate-600 px-1.5 py-0.5 rounded font-medium flex items-center gap-1">
+                                        <Building size={9} />
+                                        {userStore.name}
+                                      </span>
+                                    )}
+                                    <span className="text-[9px] bg-emerald-50 text-emerald-700 px-1.5 py-0.5 rounded font-semibold">
+                                      {assignedChatsCount} {assignedChatsCount === 1 ? 'conversa atribuída' : 'conversas atribuídas'}
+                                    </span>
+                                  </div>
+                                </div>
+                              </div>
+
+                              {currentUser?.role === 'ADMIN' && (
+                                <button
+                                  onClick={() => {
+                                    setUserForm({
+                                      id: user.id,
+                                      name: user.name,
+                                      email: user.email,
+                                      password: '',
+                                      role: user.role,
+                                      storeId: user.storeId || '',
+                                      active: user.active !== false
+                                    });
+                                    setShowUserForm(true);
+                                  }}
+                                  className="p-1.5 text-slate-500 hover:text-[#00a884] hover:bg-slate-100 rounded-lg transition-colors"
+                                  title="Editar Atendente"
+                                >
+                                  <Edit2 size={14} />
+                                </button>
+                              )}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+
+            </div>
+
           </div>
         </div>
       )}
