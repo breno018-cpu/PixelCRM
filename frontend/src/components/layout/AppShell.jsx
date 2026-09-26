@@ -21,9 +21,20 @@ export default function AppShell({
 
   useEffect(() => {
     const handleResize = () => setWindowWidth(window.innerWidth);
+    const handleKeyDown = (e) => {
+      if (e.key === 'Escape' && isCrmOpen && onCloseCrm) {
+        onCloseCrm();
+      }
+    };
+
     window.addEventListener('resize', handleResize);
-    return () => window.removeEventListener('resize', handleResize);
-  }, []);
+    window.addEventListener('keydown', handleKeyDown);
+
+    return () => {
+      window.removeEventListener('resize', handleResize);
+      window.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [isCrmOpen, onCloseCrm]);
 
   const isMobile = windowWidth < 768;
   const isTablet = windowWidth >= 768 && windowWidth < 1200;
@@ -39,7 +50,9 @@ export default function AppShell({
         
         {/* 1. NAVEGAÇÃO LATERAL ULTRA-COMPACTA (60px) */}
         {navbar && (
-          <aside className="w-[60px] shrink-0 h-full border-r border-[var(--border-light)] bg-[var(--header-bg)] flex flex-col justify-between items-center py-3 z-30 transition-colors duration-200">
+          <aside className={`w-[60px] shrink-0 h-full border-r border-[var(--border-light)] bg-[var(--header-bg)] flex flex-col justify-between items-center py-3 z-30 transition-colors duration-200 ${
+            isMobile && activeChat ? 'hidden' : 'flex'
+          }`}>
             {navbar}
           </aside>
         )}
