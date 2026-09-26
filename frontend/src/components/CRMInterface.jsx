@@ -8,7 +8,8 @@ import {
   Menu, Info, Smile, Paperclip, MoreVertical, XCircle, ChevronRight,
   LogOut, ShieldAlert, MessageCircle, HelpCircle, Archive, FolderArchive,
   FolderOpen, ArrowLeft, Sparkles, Cpu, Bot, Sliders, Play, GitFork, Lock,
-  Globe, Database, Key, ShoppingBag, Layers, Percent, FileCheck, FileCode, SendHorizontal, Activity
+  Globe, Database, Key, ShoppingBag, Layers, Percent, FileCheck, FileCode, SendHorizontal, Activity,
+  Pause, Mic, Download, ChevronUp, ChevronDown, File
 } from 'lucide-react';
 
 // LOGO CUSTOMIZADA DA PIXEL LOOM (Intersecção de linhas e tecelagem de pixels)
@@ -48,6 +49,184 @@ const PixelLoomLogo = ({ size = 32, className = "" }) => (
     <rect x="64.5" y="64.5" width="12" height="12" rx="2.5" fill="#ffffff" stroke="#7c3aed" strokeWidth="2" />
   </svg>
 );
+
+// REPRODUTOR REAL DE MENSAGENS DE VOZ E ÁUDIOS (Estilo WhatsApp)
+function VoiceNotePlayer({ mediaUrl, backendUrl, isMe }) {
+  const [isPlaying, setIsPlaying] = useState(false);
+  const [currentTime, setCurrentTime] = useState(0);
+  const [duration, setDuration] = useState(0);
+  const [playbackRate, setPlaybackRate] = useState(1);
+  const [hasError, setHasError] = useState(false);
+  const audioRef = useRef(null);
+
+  const fullUrl = mediaUrl
+    ? (mediaUrl.startsWith('http') ? mediaUrl : `${backendUrl}${mediaUrl}`)
+    : null;
+
+  useEffect(() => {
+    const audio = audioRef.current;
+    if (!audio) return;
+
+    const handleTimeUpdate = () => setCurrentTime(audio.currentTime);
+    const handleLoadedMetadata = () => {
+      setDuration(audio.duration || 0);
+      setHasError(false);
+    };
+    const handleEnded = () => {
+      setIsPlaying(false);
+      setCurrentTime(0);
+    };
+    const handleError = () => {
+      setHasError(true);
+      setIsPlaying(false);
+    };
+
+    audio.addEventListener('timeupdate', handleTimeUpdate);
+    audio.addEventListener('loadedmetadata', handleLoadedMetadata);
+    audio.addEventListener('ended', handleEnded);
+    audio.addEventListener('error', handleError);
+
+    return () => {
+      audio.removeEventListener('timeupdate', handleTimeUpdate);
+      audio.removeEventListener('loadedmetadata', handleLoadedMetadata);
+      audio.removeEventListener('ended', handleEnded);
+      audio.removeEventListener('error', handleError);
+    };
+  }, [fullUrl]);
+
+  const togglePlay = () => {
+    if (!audioRef.current || hasError) return;
+    if (isPlaying) {
+      audioRef.current.pause();
+      setIsPlaying(false);
+    } else {
+      audioRef.current.play().then(() => {
+        setIsPlaying(true);
+      }).catch(() => {
+        setHasError(true);
+      });
+    }
+  };
+
+  const handleSeek = (e) => {
+    const time = parseFloat(e.target.value);
+    setCurrentTime(time);
+    if (audioRef.current) {
+      audioRef.current.currentTime = time;
+    }
+  };
+
+  const togglePlaybackRate = () => {
+    const rates = [1, 1.5, 2];
+    const nextIdx = (rates.indexOf(playbackRate) + 1) % rates.length;
+    const nextRate = rates[nextIdx];
+    setPlaybackRate(nextRate);
+    if (audioRef.current) {
+      audioRef.current.playbackRate = nextRate;
+    }
+  };
+
+  const formatAudioTime = (sec) => {
+    if (!sec || isNaN(sec)) return '0:00';
+    const m = Math.floor(sec / 60);
+    const s = Math.floor(sec % 60);
+    return `${m}:${s < 10 ? '0' : ''}${s}`;
+  };
+
+  if (!fullUrl || hasError) {
+    return (
+      <div className="flex items-center gap-2 p-2 rounded-lg bg-amber-50 border border-amber-200 text-amber-700 text-xs">
+        <AlertCircle size={16} className="shrink-0" />
+        <span className="text-[11px]">Áudio não disponível ou expirado</span>
+      </div>
+    );
+  }
+
+  return (
+    <div className="flex items-center gap-2.5 min-w-[240px] max-w-[300px] py-1 select-none">
+      <audio ref={audioRef} src={fullUrl} preload="metadata" />
+
+      {/* Botão Play/Pause */}
+      <button
+        onClick={togglePlay}
+        className="w-9 h-9 rounded-full bg-[#00a884] text-white hover:bg-emerald-600 flex items-center justify-center shrink-0 transition-all shadow-sm active:scale-95"
+        title={isPlaying ? 'Pausar' : 'Reproduzir'}
+      >
+        {isPlaying ? <Pause size={16} /> : <Play size={16} className="ml-0.5" />}
+      </button>
+
+      {/* Trilha de progresso e scrubber */}
+      <div className="flex-1 flex flex-col justify-center gap-1">
+        <input
+          type="range"
+          min="0"
+          max={duration || 100}
+          step="0.1"
+          value={currentTime}
+          onChange={handleSeek}
+          className="w-full h-1.5 bg-[#e9edef] rounded-lg appearance-none cursor-pointer accent-[#00a884]"
+        />
+        <div className="flex items-center justify-between text-[10px] text-[#667781] font-mono">
+          <span>{formatAudioTime(currentTime)}</span>
+          <span>{duration ? formatAudioTime(duration) : '--:--'}</span>
+        </div>
+      </div>
+
+      {/* Velocidade de reprodução */}
+      <button
+        onClick={togglePlaybackRate}
+        className="px-1.5 py-0.5 rounded-full text-[9px] font-bold bg-[#e9edef] hover:bg-[#d1d7db] text-[#54656f] shrink-0 active:scale-95 transition-all"
+        title="Velocidade"
+      >
+        {playbackRate}x
+      </button>
+
+      {/* Ícone de microfone característico */}
+      <div className="w-8 h-8 rounded-full bg-[#00a884]/15 flex items-center justify-center text-[#00a884] shrink-0">
+        <Mic size={15} />
+      </div>
+    </div>
+  );
+}
+
+// CARD REAL DE DOCUMENTOS E ANEXOS
+function DocumentCard({ msg, backendUrl, isMe }) {
+  const fullUrl = msg.mediaUrl
+    ? (msg.mediaUrl.startsWith('http') ? msg.mediaUrl : `${backendUrl}${msg.mediaUrl}`)
+    : null;
+
+  const fileName = msg.text?.replace(/^📄\s*/, '') || 'Documento';
+
+  return (
+    <div className="flex items-center gap-3 p-2.5 rounded-lg border border-[#e9edef] bg-white min-w-[230px] max-w-[290px] shadow-sm">
+      <div className="w-10 h-10 rounded-lg bg-rose-50 border border-rose-200 flex items-center justify-center text-rose-500 shrink-0">
+        <FileText size={20} />
+      </div>
+
+      <div className="flex-1 min-w-0">
+        <p className="text-xs font-semibold text-[#111b21] truncate" title={fileName}>
+          {fileName}
+        </p>
+        <span className="text-[10px] text-[#667781]">Documento Anexo</span>
+      </div>
+
+      {fullUrl ? (
+        <a
+          href={fullUrl}
+          target="_blank"
+          rel="noreferrer"
+          download={fileName}
+          className="p-1.5 rounded-full bg-[#f0f2f5] hover:bg-[#eae6df] text-[#54656f] hover:text-[#111b21] transition-colors shrink-0 shadow-sm"
+          title="Baixar Documento"
+        >
+          <Download size={16} />
+        </a>
+      ) : (
+        <span className="text-[10px] text-amber-600 font-medium shrink-0">Expirado</span>
+      )}
+    </div>
+  );
+}
 
 export default function CRMInterface({ onGoToConnect, qrToken }) {
   const { whatsappStatus, isConnected, backendUrl } = useSocket();
@@ -95,6 +274,11 @@ export default function CRMInterface({ onGoToConnect, qrToken }) {
   const [notesSavedAlert, setNotesSavedAlert] = useState(false);
   const [showCrmPanel, setShowCrmPanel] = useState(false); // Controla o painel lateral de CRM/Contato
   const [hoveredChatId, setHoveredChatId] = useState(null);
+
+  // Busca interna dentro do chat ativo (Fase 04)
+  const [showInChatSearch, setShowInChatSearch] = useState(false);
+  const [chatSearchQuery, setChatSearchQuery] = useState('');
+  const [currentMatchIdx, setCurrentMatchIdx] = useState(0);
   
   // Modais e Popups
   const [showTutorialModal, setShowTutorialModal] = useState(false);
@@ -165,6 +349,66 @@ export default function CRMInterface({ onGoToConnect, qrToken }) {
       window.removeEventListener('keydown', handleKeyDown);
     };
   }, [activeChat, selectChat]);
+
+  // Mensagens correspondentes na busca interna (Fase 04)
+  const searchMatches = React.useMemo(() => {
+    if (!chatSearchQuery.trim() || !messages.length) return [];
+    const q = chatSearchQuery.toLowerCase().trim();
+    return messages
+      .filter(m => m.text && m.text.toLowerCase().includes(q))
+      .map(m => m.id);
+  }, [chatSearchQuery, messages]);
+
+  const scrollToMatchedMessage = (msgId) => {
+    const el = document.getElementById(`msg-${msgId}`);
+    if (el) {
+      el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }
+  };
+
+  const handlePrevMatch = () => {
+    if (searchMatches.length === 0) return;
+    const next = (currentMatchIdx - 1 + searchMatches.length) % searchMatches.length;
+    setCurrentMatchIdx(next);
+    scrollToMatchedMessage(searchMatches[next]);
+  };
+
+  const handleNextMatch = () => {
+    if (searchMatches.length === 0) return;
+    const next = (currentMatchIdx + 1) % searchMatches.length;
+    setCurrentMatchIdx(next);
+    scrollToMatchedMessage(searchMatches[next]);
+  };
+
+  useEffect(() => {
+    if (searchMatches.length > 0) {
+      setCurrentMatchIdx(0);
+      scrollToMatchedMessage(searchMatches[0]);
+    }
+  }, [chatSearchQuery]);
+
+  // Reseta busca ao trocar de conversa
+  useEffect(() => {
+    setShowInChatSearch(false);
+    setChatSearchQuery('');
+    setCurrentMatchIdx(0);
+  }, [activeChat?.id]);
+
+  const renderMessageText = (text, isCurrentMatched) => {
+    if (!chatSearchQuery.trim() || !text) return text;
+    const q = chatSearchQuery.trim();
+    const regex = new RegExp(`(${q.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')})`, 'gi');
+    const parts = text.split(regex);
+    return parts.map((part, i) =>
+      part.toLowerCase() === q.toLowerCase() ? (
+        <mark key={i} className={`px-0.5 rounded font-semibold ${isCurrentMatched ? 'bg-amber-400 text-black' : 'bg-yellow-200 text-black'}`}>
+          {part}
+        </mark>
+      ) : (
+        part
+      )
+    );
+  };
 
   // Escuta expiração de sessão para retornar ao login
   useEffect(() => {
@@ -910,11 +1154,95 @@ export default function CRMInterface({ onGoToConnect, qrToken }) {
                     >
                       <Tags size={18} />
                     </button>
-                    <button className="p-2 hover:bg-[#eae6df] rounded-full" title="Pesquisar">
+                    <button
+                      onClick={() => setShowInChatSearch(prev => !prev)}
+                      className={`p-2.5 rounded-full transition-colors ${
+                        showInChatSearch ? 'bg-[#eae6df] text-[#00a884]' : 'hover:bg-[#eae6df]'
+                      }`}
+                      title="Pesquisar mensagens nesta conversa"
+                    >
                       <Search size={18} />
                     </button>
                   </div>
                 </header>
+
+                {/* Barra de Pesquisa Interna no Chat (Fase 04) */}
+                {showInChatSearch && (
+                  <div className="bg-white border-b border-[#e9edef] px-4 py-2 flex items-center justify-between gap-3 shrink-0 z-20 shadow-sm animate-fade-in select-none">
+                    <div className="relative flex-1 flex items-center bg-[#f0f2f5] rounded-lg px-3 py-1.5 border border-transparent focus-within:border-[#00a884]">
+                      <Search size={15} className="text-[#667781] mr-2 shrink-0" />
+                      <input
+                        type="text"
+                        placeholder="Pesquisar mensagens nesta conversa..."
+                        value={chatSearchQuery}
+                        onChange={(e) => setChatSearchQuery(e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') {
+                            e.preventDefault();
+                            if (e.shiftKey) handlePrevMatch();
+                            else handleNextMatch();
+                          } else if (e.key === 'Escape') {
+                            setShowInChatSearch(false);
+                          }
+                        }}
+                        autoFocus
+                        className="w-full bg-transparent border-none text-xs text-[#111b21] focus:outline-none placeholder-[#667781]"
+                      />
+                      {chatSearchQuery && (
+                        <button
+                          onClick={() => setChatSearchQuery('')}
+                          className="text-[#667781] hover:text-black p-0.5 rounded"
+                          title="Limpar texto"
+                        >
+                          <X size={14} />
+                        </button>
+                      )}
+                    </div>
+
+                    <div className="flex items-center gap-1.5 shrink-0">
+                      <span className="text-[11px] text-[#667781] font-medium min-w-[70px] text-center">
+                        {chatSearchQuery.trim() ? (
+                          searchMatches.length > 0 ? (
+                            `${currentMatchIdx + 1} de ${searchMatches.length}`
+                          ) : (
+                            '0 resultados'
+                          )
+                        ) : (
+                          'Digite algo'
+                        )}
+                      </span>
+
+                      <button
+                        onClick={handlePrevMatch}
+                        disabled={searchMatches.length === 0}
+                        className="p-1.5 hover:bg-[#f0f2f5] rounded text-[#54656f] disabled:opacity-30 disabled:hover:bg-transparent"
+                        title="Anterior (Shift+Enter)"
+                      >
+                        <ChevronUp size={16} />
+                      </button>
+
+                      <button
+                        onClick={handleNextMatch}
+                        disabled={searchMatches.length === 0}
+                        className="p-1.5 hover:bg-[#f0f2f5] rounded text-[#54656f] disabled:opacity-30 disabled:hover:bg-transparent"
+                        title="Próxima (Enter)"
+                      >
+                        <ChevronDown size={16} />
+                      </button>
+
+                      <button
+                        onClick={() => {
+                          setShowInChatSearch(false);
+                          setChatSearchQuery('');
+                        }}
+                        className="p-1.5 hover:bg-[#f0f2f5] rounded text-[#54656f] hover:text-black ml-1"
+                        title="Fechar busca (Esc)"
+                      >
+                        <X size={16} />
+                      </button>
+                    </div>
+                  </div>
+                )}
 
                 {activeChat.isArchived && (
                   <div className="bg-white border-b border-[#e9edef] py-2 px-4 flex items-center justify-between text-xs text-amber-600 font-medium shrink-0 z-10 shadow-sm">
@@ -999,13 +1327,19 @@ export default function CRMInterface({ onGoToConnect, qrToken }) {
 
                       {messages.map((msg) => {
                         const isMe = msg.fromMe;
+                        const isCurrentMatch = searchMatches[currentMatchIdx] === msg.id;
+                        const isMatched = searchMatches.includes(msg.id);
+
                         return (
                           <div
                             key={msg.id}
-                            className={`flex ${isMe ? 'justify-end' : 'justify-start'} animate-fade-in`}
+                            id={`msg-${msg.id}`}
+                            className={`flex ${isMe ? 'justify-end' : 'justify-start'} animate-fade-in transition-all duration-300`}
                           >
                             <div
-                              className={`max-w-md rounded-lg p-2.5 text-[12.5px] border relative group pr-7 ${
+                              className={`max-w-md rounded-lg p-2.5 text-[12.5px] border relative group transition-all duration-300 ${
+                                isCurrentMatch ? 'ring-2 ring-[#00a884] ring-offset-2 shadow-lg' : ''
+                              } ${
                                 isMe
                                   ? 'bg-[#d9fdd3] border-[#d0f4ca] text-[#111b21] rounded-tr-none shadow-sm'
                                   : 'bg-white border-white text-[#111b21] rounded-tl-none shadow-sm'
@@ -1017,6 +1351,7 @@ export default function CRMInterface({ onGoToConnect, qrToken }) {
                                 </span>
                               ) : null}
                               
+                              {/* RENDERIZAÇÃO DE TIPOS DE MÍDIA REAIS (Fase 04) */}
                               {msg.type === 'image' ? (
                                 <div className="space-y-1.5 cursor-pointer" onClick={() => {
                                   if (msg.mediaUrl) {
@@ -1041,10 +1376,40 @@ export default function CRMInterface({ onGoToConnect, qrToken }) {
                                     </div>
                                     <div className="absolute inset-0 bg-black/5 hover:bg-black/0 transition-colors pointer-events-none" />
                                   </div>
-                                  {msg.text && <p className="whitespace-pre-wrap leading-relaxed break-words mt-1">{msg.text}</p>}
+                                  {msg.text && <p className="whitespace-pre-wrap leading-relaxed break-words mt-1">{renderMessageText(msg.text, isCurrentMatch)}</p>}
+                                </div>
+                              ) : msg.type === 'audio' ? (
+                                <VoiceNotePlayer 
+                                  mediaUrl={msg.mediaUrl} 
+                                  backendUrl={backendUrl} 
+                                  isMe={isMe} 
+                                />
+                              ) : msg.type === 'document' ? (
+                                <DocumentCard 
+                                  msg={msg} 
+                                  backendUrl={backendUrl} 
+                                  isMe={isMe} 
+                                />
+                              ) : msg.type === 'video' ? (
+                                <div className="rounded-md overflow-hidden border border-[#e9edef] max-w-[285px] bg-[#f0f2f5]">
+                                  {msg.mediaUrl ? (
+                                    <video 
+                                      src={msg.mediaUrl.startsWith('http') ? msg.mediaUrl : `${backendUrl}${msg.mediaUrl}`} 
+                                      controls 
+                                      className="w-full h-auto max-h-[200px] object-cover" 
+                                    />
+                                  ) : (
+                                    <div className="flex flex-col items-center justify-center p-4 text-[#667781] text-xs gap-1.5">
+                                      <AlertCircle size={18} className="text-amber-500" />
+                                      <span className="text-[10px]">Vídeo não disponível ou expirado</span>
+                                    </div>
+                                  )}
+                                  {msg.text && <p className="whitespace-pre-wrap leading-relaxed break-words p-1 text-xs">{renderMessageText(msg.text, isCurrentMatch)}</p>}
                                 </div>
                               ) : (
-                                <p className="whitespace-pre-wrap leading-relaxed break-words">{msg.text}</p>
+                                <p className="whitespace-pre-wrap leading-relaxed break-words">
+                                  {renderMessageText(msg.text, isCurrentMatch)}
+                                </p>
                               )}
                               
                               <div className="flex items-center justify-end gap-1 mt-1 text-[9px] text-[#667781] select-none">

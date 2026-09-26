@@ -386,12 +386,23 @@ export async function initWhatsApp(io) {
         else if (msg.message?.videoMessage) msgType = 'video';
         else if (msg.message?.documentMessage) msgType = 'document';
 
+        let resolvedText = text;
+        if (!resolvedText) {
+          if (msgType === 'image') resolvedText = '📷 Imagem';
+          else if (msgType === 'audio') resolvedText = msg.message?.audioMessage?.ptt ? '🎤 Mensagem de voz' : '🎵 Áudio';
+          else if (msgType === 'video') resolvedText = '🎥 Vídeo';
+          else if (msgType === 'document') {
+            const fileName = msg.message?.documentMessage?.fileName;
+            resolvedText = fileName ? `📄 ${fileName}` : '📄 Documento';
+          }
+        }
+
         messagesToInsert.push({
           id: msg.key.id,
           chatId: jid,
           fromMe: fromMe,
           senderName: senderName,
-          text: text,
+          text: resolvedText,
           type: msgType,
           timestamp: timestamp,
           status: fromMe ? 'SENT' : 'READ'
@@ -578,6 +589,18 @@ async function saveMessage(msg, shouldEmit = true) {
   else if (msg.message?.videoMessage) msgType = 'video';
   else if (msg.message?.documentMessage) msgType = 'document';
 
+  // Define texto representativo para mídias sem legenda
+  let resolvedText = text;
+  if (!resolvedText) {
+    if (msgType === 'image') resolvedText = '📷 Imagem';
+    else if (msgType === 'audio') resolvedText = msg.message?.audioMessage?.ptt ? '🎤 Mensagem de voz' : '🎵 Áudio';
+    else if (msgType === 'video') resolvedText = '🎥 Vídeo';
+    else if (msgType === 'document') {
+      const fileName = msg.message?.documentMessage?.fileName;
+      resolvedText = fileName ? `📄 ${fileName}` : '📄 Documento';
+    }
+  }
+
   let chat = await prisma.chat.findUnique({
     where: { id: jid }
   });
@@ -590,7 +613,7 @@ async function saveMessage(msg, shouldEmit = true) {
         pushName: msg.pushName || null,
         phone: phone,
         unreadCount: fromMe ? 0 : 1,
-        lastMessageText: text,
+        lastMessageText: resolvedText,
         lastMessageTime: timestamp,
         isArchived: false
       }
@@ -609,7 +632,7 @@ async function saveMessage(msg, shouldEmit = true) {
     };
 
     if (isNewer) {
-      dataToUpdate.lastMessageText = text;
+      dataToUpdate.lastMessageText = resolvedText;
       dataToUpdate.lastMessageTime = timestamp;
       if (!fromMe) {
         dataToUpdate.unreadCount = chat.unreadCount + 1;
@@ -631,6 +654,11 @@ async function saveMessage(msg, shouldEmit = true) {
   }
 
   let mediaUrl = null;
+  const mediaDir = path.resolve('public/media');
+  if (!fs.existsSync(mediaDir)) {
+    fs.mkdirSync(mediaDir, { recursive: true });
+  }
+
   if (msgType === 'image') {
     try {
       const buffer = await downloadMediaMessage(
@@ -640,17 +668,68 @@ async function saveMessage(msg, shouldEmit = true) {
         { rekey: true }
       );
       if (buffer) {
-        const mediaDir = path.resolve('public/media');
-        if (!fs.existsSync(mediaDir)) {
-          fs.mkdirSync(mediaDir, { recursive: true });
-        }
         const filename = `${msg.key.id}.jpg`;
         fs.writeFileSync(path.join(mediaDir, filename), buffer);
         mediaUrl = `/media/${filename}`;
-        console.log(`[WhatsApp] Mídia de imagem baixada e salva em: ${mediaUrl}`);
+        console.log(`[WhatsApp] Imagem baixada e salva em: ${mediaUrl}`);
       }
     } catch (e) {
       console.warn(`[WhatsApp] Ignorando download da imagem ${msg.key.id} (não disponível ou expirada):`, e.message);
+    }
+  } else if (msgType === 'audio') {
+    try {
+      const buffer = await downloadMediaMessage(
+        msg,
+        'buffer',
+        {},
+        { rekey: true }
+      );
+      if (buffer) {
+        const mime = msg.message?.audioMessage?.mimetype || 'audio/ogg';
+        const ext = mime.includes('mp4') || mime.includes('aac') || mime.includes('m4a') ? 'm4a' : 'ogg';
+        const filename = `${msg.key.id}.${ext}`;
+        fs.writeFileSync(path.join(mediaDir, filename), buffer);
+        mediaUrl = `/media/${filename}`;
+        console.log(`[WhatsApp] Áudio baixado e salvo em: ${mediaUrl}`);
+      }
+    } catch (e) {
+      console.warn(`[WhatsApp] Ignorando download do áudio ${msg.key.id} (não disponível ou expirado):`, e.message);
+    }
+  } else if (msgType === 'document') {
+    try {
+      const buffer = await downloadMediaMessage(
+        msg,
+        'buffer',
+        {},
+        { rekey: true }
+      );
+      if (buffer) {
+        const rawFileName = msg.message?.documentMessage?.fileName || `documento_${msg.key.id}`;
+        const safeFileName = rawFileName.replace(/[^a-zA-Z0-9._-]/g, '_');
+        const filename = `${msg.key.id}_${safeFileName}`;
+        fs.writeFileSync(path.join(mediaDir, filename), buffer);
+        mediaUrl = `/media/${filename}`;
+        console.log(`[WhatsApp] Documento baixado e salvo em: ${mediaUrl}`);
+      }
+    } catch (e) {
+      console.warn(`[WhatsApp] Ignorando download do documento ${msg.key.id} (não disponível ou expirado):`, e.message);
+    }
+  } else if (msgType === 'video') {
+    try {
+      const buffer = await downloadMediaMessage(
+        msg,
+        'buffer',
+        {},
+        { rekey: true }
+      );
+      if (buffer) {
+        const filename = `${msg.key.id}.mp4`;
+        fs.writeFileSync(path.join(mediaDir, filename), buffer);
+        mediaUrl = `/media/${filename}`;
+        console.log(`[WhatsApp] Vídeo baixado e salvo em: ${mediaUrl}`);
+      }
+    } catch (e) {
+      console.warn(`[WhatsApp] Ignorando download do vídeo ${msg.key.id} (não disponível ou expirado):`, e.message);
     }
   }
 
@@ -661,7 +740,7 @@ async function saveMessage(msg, shouldEmit = true) {
       chatId: jid,
       fromMe: fromMe,
       senderName: senderName,
-      text: text,
+      text: resolvedText,
       type: msgType,
       mediaUrl: mediaUrl,
       timestamp: timestamp,
@@ -669,7 +748,8 @@ async function saveMessage(msg, shouldEmit = true) {
     },
     update: {
       status: fromMe ? 'SENT' : 'READ',
-      mediaUrl: mediaUrl !== null ? mediaUrl : undefined
+      mediaUrl: mediaUrl !== null ? mediaUrl : undefined,
+      text: resolvedText
     }
   });
 
