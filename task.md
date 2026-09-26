@@ -105,3 +105,46 @@
 - [x] **ETAPA 18 — Microinterações**: Feedback visual tátil de hover, click, envio e cópia.
 - [x] **ETAPA 19 — Performance**: Otimização de re-renders e tamanho de bundle.
 - [x] **ETAPA 20 — Teste Completo**: Homologação ponta a ponta sem dados simulados.
+
+---
+
+# Estrutura Completa do CRM (PROMPT 05)
+
+- [x] **MIGRATION & BANCO DE DADOS**:
+  - Backup preventivo de segurança `backend/prisma/dev.db.bak`.
+  - Novos modelos relacionais Prisma: `Company`, `Store`, `Team`, `Role`, `Permission`, `RolePermission`, `UserPermissionException`, `ProductCategory`, `ProductCollection`, `Product`, `CollectionProduct`, `Pipeline`, `PipelineStage`, `LossReason`, `Opportunity`, `Order`, `OrderItem`, `Task`, `Activity`, `QuickReply`, `AuditLog`.
+  - Migração executada e sincronizada via Prisma sem perda de mensagens ou chats.
+
+- [x] **EMPRESA MATRIZ & LOJAS / FILIAIS**:
+  - Provisionamento da Empresa Matriz ("Shineray do Brasil Montadora de Motocicletas Ltda.") com CNPJ real, endereço e dados corporativos.
+  - Endpoints REST `/api/companies/current` e `/api/stores` protegidos por autenticação e RBAC.
+  - Interface administrativa completa em `CorporateAdminModal.jsx`.
+
+- [x] **EQUIPES & USUÁRIOS**:
+  - Modelo `Team` para setores (Comercial, Atendimento, Pós-venda) com líder e lojas vinculadas.
+  - Endpoints REST `/api/teams` e `/api/users`.
+  - Gestão e atribuição de colaboradores a cargos, equipes e filiais.
+
+- [x] **CARGOS, PERMISSÕES GRANULARES & ESCOPOS**:
+  - Catálogo de 52 permissões canônicas registradas no SQLite.
+  - 10 Cargos-base provisionados (`ADMINISTRADOR`, `GESTOR`, `GERENTE`, `SUPERVISOR`, `VENDEDOR`, `ATENDENTE`, `PÓS-VENDA`, `FINANCEIRO`, `MARKETING`, `SUPORTE`).
+  - Duplicação de Cargos com clonagem automática de permissões (`POST /api/roles/:id/duplicate`).
+  - Matriz de Permissões com seleção de escopo (`OWN`, `TEAM`, `STORE`, `COMPANY`, `ALL`).
+  - Precedência rigorosa no backend: `NEGADO EXPLICITAMENTE > EXCEÇÃO ESPECÍFICA > CARGO > EQUIPE > PADRÃO`.
+  - Proteção inviolável do Administrador: bloqueio de remoção ou desativação do único administrador ativo.
+
+- [x] **CATÁLOGO DE PRODUTOS & WHATSAPP**:
+  - Modelos `ProductCategory`, `ProductCollection` e `Product` com suporte a fotos, preços promocionais e SKU.
+  - Endpoints REST de catálogo `/api/categories` e `/api/products`.
+  - Envio direto de produto para a conversa do WhatsApp (`POST /api/products/:id/send-whatsapp` via Baileys).
+  - Modal `SendProductModal.jsx` acessível no chat ativo (cabeçalho, barra de input e menu de anexos).
+  - Modal `CatalogGeneralModal.jsx` para visualização e cadastro de motos na barra lateral.
+
+- [x] **CRM ESTENDIDO, FUNIS, OPORTUNIDADES & PEDIDOS**:
+  - Pipeline comercial padrão com 4 etapas e motivos de perda cadastrados.
+  - Endpoints REST `/api/pipelines`, `/api/opportunities`, `/api/orders`, `/api/tasks`, `/api/quick-replies`.
+  - Trilha de atividades do cliente persistida em `Activity`.
+
+- [x] **AUDITORIA DO SISTEMA**:
+  - Trilha de auditoria imutável em `AuditLog` registrando operador, ação, recurso, IP e data/hora.
+  - Visualizador de logs com busca e filtros na aba de Auditoria.

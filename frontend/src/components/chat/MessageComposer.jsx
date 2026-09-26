@@ -4,8 +4,9 @@
 import React, { useRef, useState, useEffect } from 'react';
 import { 
   Smile, Paperclip, Send, Loader2, Mic, Image, 
-  FileText, X, AlertCircle, RefreshCw 
+  FileText, X, AlertCircle, RefreshCw, ShoppingBag 
 } from 'lucide-react';
+
 
 export default function MessageComposer({
   value = '',
@@ -16,6 +17,7 @@ export default function MessageComposer({
   sendError = '',
   onClearError,
   onAttachFile,
+  onOpenProductCatalog,
   placeholder = "Digite uma mensagem"
 }) {
   const textareaRef = useRef(null);
@@ -143,6 +145,22 @@ export default function MessageComposer({
               </div>
               <span>Documento</span>
             </button>
+
+            {onOpenProductCatalog && (
+              <button
+                type="button"
+                onClick={() => {
+                  setShowAttachMenu(false);
+                  onOpenProductCatalog();
+                }}
+                className="flex items-center gap-2.5 px-3 py-2 rounded-xl hover:bg-[var(--active-bg)] transition-colors text-left"
+              >
+                <div className="w-7 h-7 rounded-lg bg-emerald-100 text-emerald-700 flex items-center justify-center">
+                  <ShoppingBag size={15} />
+                </div>
+                <span>Catálogo de Motos</span>
+              </button>
+            )}
           </div>
         </>
       )}
@@ -195,6 +213,21 @@ export default function MessageComposer({
         >
           <Paperclip size={22} className={showAttachMenu ? "rotate-45" : ""} />
         </button>
+
+        {/* Atalho Direto de Catálogo de Motos */}
+        {onOpenProductCatalog && (
+          <button
+            type="button"
+            onClick={onOpenProductCatalog}
+            disabled={disabled}
+            className="p-2 rounded-full text-[var(--text-secondary)] hover:text-[#00a884] hover:bg-[var(--active-bg)] transition-colors shrink-0 disabled:opacity-40"
+            title="Abrir Catálogo de Motos Shineray"
+            aria-label="Catálogo de Motos"
+          >
+            <ShoppingBag size={21} />
+          </button>
+        )}
+
 
         {/* Campo de Texto Multilinha Expansível */}
         <div className="flex-1 bg-[var(--input-bg)] border border-[var(--border-light)] focus-within:border-[#00a884]/60 focus-within:ring-1 focus-within:ring-[#00a884]/20 rounded-2xl px-3.5 py-1.5 flex items-center shadow-2xs transition-all">

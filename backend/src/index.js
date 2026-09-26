@@ -5,11 +5,13 @@ import { Server } from 'socket.io';
 import cors from 'cors';
 import dotenv from 'dotenv';
 import bcrypt from 'bcryptjs';
-import { initWhatsApp, getConnectionStatus, logoutWhatsApp, sendMessage, getWASocket, toggleArchiveChat } from './whatsapp.js';
+import { initWhatsApp, getConnectionStatus, logoutWhatsApp, sendMessage, sendProductMessage, getWASocket, toggleArchiveChat } from './whatsapp.js';
 import { prisma } from './db.js';
 import { authenticateToken, requireRole, generateToken } from './auth.js';
 import { ensureDefaultAdmin } from './initAdmin.js';
 import { testAiConnection, generateCopilotSuggestion } from './aiService.js';
+import { corporateRouter } from './corporateRoutes.js';
+
 
 dotenv.config();
 
@@ -123,6 +125,39 @@ app.post('/api/auth/login', async (req, res) => {
 app.get('/api/auth/me', authenticateToken, async (req, res) => {
   return res.json({ user: req.user });
 });
+
+/**
+ * Envia um card de produto diretamente para uma conversa ativa via WhatsApp
+ */
+app.post('/api/products/:id/send-whatsapp', authenticateToken, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { chatId } = req.body;
+
+    if (!chatId) {
+      return res.status(400).json({ error: 'Chat de destino é obrigatório.' });
+    }
+
+    const product = await prisma.product.findUnique({
+      where: { id },
+      include: { category: true }
+    });
+
+    if (!product) {
+      return res.status(404).json({ error: 'Produto não encontrado no catálogo.' });
+    }
+
+    const message = await sendProductMessage(chatId, product, req.user?.id);
+    return res.json({ success: true, message });
+  } catch (error) {
+    console.error('[API] Erro ao enviar produto no WhatsApp:', error);
+    return res.status(500).json({ error: error.message || 'Erro ao enviar card do produto.' });
+  }
+});
+
+// Registra todas as rotas corporativas do Prompt 05 (Empresas, Lojas, Equipes, Cargos, Permissões, Usuários, Catálogo, CRM e Auditoria)
+app.use('/api', corporateRouter);
+
 
 // --- ROTAS DO WHATSAPP (SESSÃO) ---
 

@@ -14,6 +14,10 @@ import {
   Kanban, LayoutGrid, ArrowRight, Filter, TrendingUp, RefreshCw,
   Copy, Eye, EyeOff, Wand2
 } from 'lucide-react';
+import CorporateAdminModal from './corporate/CorporateAdminModal';
+import CatalogGeneralModal from './catalog/CatalogGeneralModal';
+import SendProductModal from './chat/SendProductModal';
+
 
 // LOGO CUSTOMIZADA DA PIXEL LOOM (Intersecção de linhas e tecelagem de pixels)
 const PixelLoomLogo = ({ size = 32, className = "" }) => (
@@ -564,6 +568,12 @@ export default function CRMInterface({ onGoToConnect, qrToken }) {
   const [selectedImagePreview, setSelectedImagePreview] = useState(null); // Lightbox URL
   const [showQrLinkPopup, setShowQrLinkPopup] = useState(false);
   const [linkCopied, setLinkCopied] = useState(false);
+
+  // Modais Corporativos e Catálogo (Prompt 05)
+  const [showCorporateModal, setShowCorporateModal] = useState(false);
+  const [showCatalogModal, setShowCatalogModal] = useState(false);
+  const [showSendProductModal, setShowSendProductModal] = useState(false);
+
 
   const qrFullUrl = qrToken ? `${window.location.origin}/?qr=${qrToken}` : '';
   const handleCopyQrLink = () => {
@@ -1142,6 +1152,26 @@ export default function CRMInterface({ onGoToConnect, qrToken }) {
             >
               <Building2 size={22} />
             </button>
+
+            {/* Catálogo Geral de Motos (Prompt 05) */}
+            <button
+              onClick={() => setShowCatalogModal(true)}
+              className="w-11 h-11 rounded-full flex items-center justify-center transition-all relative text-[#54656f] hover:bg-[#eae6df] hover:text-emerald-600"
+              title="Catálogo Geral de Motos Shineray"
+            >
+              <ShoppingBag size={22} />
+            </button>
+
+            {/* Governança Corporativa & Cargos (Prompt 05) */}
+            {currentUser?.role === 'ADMIN' && (
+              <button
+                onClick={() => setShowCorporateModal(true)}
+                className="w-11 h-11 rounded-full flex items-center justify-center transition-all relative text-[#54656f] hover:bg-[#eae6df] hover:text-[var(--primary)]"
+                title="Governança Corporativa, Cargos & Auditoria (Prompt 05)"
+              >
+                <ShieldCheck size={22} className="text-emerald-600" />
+              </button>
+            )}
           </nav>
         </div>
 
@@ -1597,6 +1627,15 @@ export default function CRMInterface({ onGoToConnect, qrToken }) {
                     >
                       <Search size={18} />
                     </button>
+
+                    {/* Enviar Moto do Catálogo (Prompt 05) */}
+                    <button
+                      onClick={() => setShowSendProductModal(true)}
+                      className="p-2.5 rounded-full transition-colors hover:bg-[#eae6df] text-emerald-600"
+                      title="Enviar Moto do Catálogo no WhatsApp"
+                    >
+                      <ShoppingBag size={18} />
+                    </button>
                   </div>
                 </header>
 
@@ -2025,6 +2064,14 @@ export default function CRMInterface({ onGoToConnect, qrToken }) {
                       </button>
                       <button type="button" className="p-2 hover:bg-[#eae6df] rounded-full">
                         <Paperclip size={22} />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setShowSendProductModal(true)}
+                        className="p-2 text-[#54656f] hover:text-emerald-600 hover:bg-[#eae6df] rounded-full transition-colors"
+                        title="Enviar Moto do Catálogo no WhatsApp"
+                      >
+                        <ShoppingBag size={21} />
                       </button>
                     </div>
 
@@ -4284,6 +4331,31 @@ export default function CRMInterface({ onGoToConnect, qrToken }) {
         </div>
       )}
 
+      {/* MODAIS DO PROMPT 05: GOVERNANÇA CORPORATIVA & CATÁLOGO */}
+      <CorporateAdminModal
+        isOpen={showCorporateModal}
+        onClose={() => setShowCorporateModal(false)}
+        currentUser={currentUser}
+      />
+
+      <CatalogGeneralModal
+        isOpen={showCatalogModal}
+        onClose={() => setShowCatalogModal(false)}
+        currentUser={currentUser}
+      />
+
+      <SendProductModal
+        isOpen={showSendProductModal}
+        onClose={() => setShowSendProductModal(false)}
+        activeChat={activeChat}
+        onProductSent={() => {
+          if (activeChat?.id) {
+            fetchMessages(activeChat.id);
+          }
+        }}
+      />
+
     </div>
   );
 }
+

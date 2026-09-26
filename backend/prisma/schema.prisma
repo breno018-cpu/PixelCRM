@@ -7,19 +7,229 @@ generator client {
   provider = "prisma-client-js"
 }
 
-model Store {
-  id        String   @id @default(uuid())
-  name      String
-  address   String?
-  phone     String?
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-  users     User[]
-  chats     Chat[]
+// ==========================================
+// ESTRUTURA CORPORATIVA
+// ==========================================
+
+model Company {
+  id          String   @id @default(uuid())
+  name        String
+  legalName   String?  // Razão Social
+  tradeName   String?  // Nome Fantasia
+  cnpj        String?  @unique
+  phone       String?
+  email       String?
+  address     String?
+  city        String?
+  state       String?
+  country     String?  @default("Brasil")
+  logoUrl     String?
+  timezone    String   @default("America/Sao_Paulo")
+  currency    String   @default("BRL")
+  language    String   @default("pt-BR")
+  status      String   @default("ACTIVE") // ACTIVE, INACTIVE
+
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  stores          Store[]
+  teams           Team[]
+  users           User[]
+  roles           Role[]
+  chats           Chat[]
+  productCategories ProductCategory[]
+  productCollections ProductCollection[]
+  products        Product[]
+  pipelines       Pipeline[]
+  lossReasons     LossReason[]
+  opportunities   Opportunity[]
+  orders          Order[]
+  tasks           Task[]
+  activities      Activity[]
+  quickReplies    QuickReply[]
+  auditLogs       AuditLog[]
 }
+
+model Store {
+  id            String   @id @default(uuid())
+  companyId     String?
+  company       Company? @relation(fields: [companyId], references: [id], onDelete: SetNull)
+
+  name          String
+  code          String?  // Código da filial (ex: MATRIZ, FIL-01)
+  address       String?
+  phone         String?
+  businessHours String?  // Horário de funcionamento (ex: Seg-Sex 08h-18h, Sab 08h-12h)
+  status        String   @default("ACTIVE") // ACTIVE, INACTIVE
+
+  managerId     String?
+  manager       User?    @relation("StoreManager", fields: [managerId], references: [id], onDelete: SetNull)
+
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  users         User[]
+  chats         Chat[]
+  teams         Team[]
+  products      Product[]
+  opportunities Opportunity[]
+  orders        Order[]
+  quickReplies  QuickReply[]
+
+  @@index([companyId])
+  @@index([managerId])
+}
+
+model Team {
+  id          String   @id @default(uuid())
+  companyId   String?
+  company     Company? @relation(fields: [companyId], references: [id], onDelete: SetNull)
+
+  storeId     String?
+  store       Store?   @relation(fields: [storeId], references: [id], onDelete: SetNull)
+
+  name        String   // Comercial, Atendimento, Pós-venda, etc.
+  description String?
+  status      String   @default("ACTIVE") // ACTIVE, ARCHIVED
+
+  leaderId    String?
+  leader      User?    @relation("TeamLeader", fields: [leaderId], references: [id], onDelete: SetNull)
+
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  users       User[]
+  roles       Role[]
+
+  @@index([companyId])
+  @@index([storeId])
+  @@index([leaderId])
+}
+
+// ==========================================
+// CARGOS, PERMISSÕES E ESCOPOS
+// ==========================================
+
+model Role {
+  id          String   @id @default(uuid())
+  companyId   String?
+  company     Company? @relation(fields: [companyId], references: [id], onDelete: SetNull)
+
+  name        String   // Administrador, Gestor, Vendedor, etc.
+  description String?
+  scope       String   @default("OWN") // OWN, TEAM, STORE, COMPANY, ALL
+  teamId      String?
+  team        Team?    @relation(fields: [teamId], references: [id], onDelete: SetNull)
+  isSystem    Boolean  @default(false) // Presets de sistema não podem ser deletados
+  status      String   @default("ACTIVE") // ACTIVE, ARCHIVED
+
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  users       User[]
+  permissions RolePermission[]
+
+  @@index([companyId])
+  @@index([teamId])
+}
+
+model Permission {
+  id          String   @id // Ex: CUSTOMERS_VIEW, MESSAGES_SEND, CATALOG_EDIT
+  resource    String   // CUSTOMERS, CHATS, MESSAGES, CATALOG, PRODUCTS, ORDERS, etc.
+  action      String   // VIEW, CREATE, EDIT, DELETE, EXPORT, ASSIGN, SHARE, ADMIN
+  description String
+
+  rolePermissions RolePermission[]
+  userExceptions  UserPermissionException[]
+}
+
+model RolePermission {
+  id           String     @id @default(uuid())
+  roleId       String
+  role         Role       @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  permissionId String
+  permission   Permission @relation(fields: [permissionId], references: [id], onDelete: Cascade)
+
+  scope        String     @default("OWN") // OWN, TEAM, STORE, COMPANY, ALL
+  granted      Boolean    @default(true)
+
+  @@unique([roleId, permissionId])
+  @@index([roleId])
+  @@index([permissionId])
+}
+
+model UserPermissionException {
+  id            String     @id @default(uuid())
+  userId        String
+  user          User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  permissionId  String
+  permission    Permission @relation(fields: [permissionId], references: [id], onDelete: Cascade)
+
+  granted       Boolean    // true = permissão especial extra, false = bloqueio explícito (prevalência máxima)
+  scopeOverride String?    // OWN, TEAM, STORE, COMPANY, ALL
+  validUntil    DateTime?  // Permissão temporária opcional
+
+  createdAt     DateTime   @default(now())
+
+  @@unique([userId, permissionId])
+  @@index([userId])
+  @@index([permissionId])
+}
+
+// ==========================================
+// USUÁRIOS
+// ==========================================
+
+model User {
+  id           String    @id @default(uuid())
+  companyId    String?
+  company      Company?  @relation(fields: [companyId], references: [id], onDelete: SetNull)
+
+  email        String    @unique
+  passwordHash String
+  name         String
+  phone        String?
+  role         String    @default("OPERATOR") // ADMIN, MANAGER, OPERATOR (mantido como fallback legado)
+  isActive     Boolean   @default(true)
+
+  storeId      String?
+  store        Store?    @relation(fields: [storeId], references: [id], onDelete: SetNull)
+
+  teamId       String?
+  team         Team?     @relation(fields: [teamId], references: [id], onDelete: SetNull)
+
+  roleId       String?
+  roleRel      Role?     @relation(fields: [roleId], references: [id], onDelete: SetNull)
+
+  assignedChats Chat[]
+  permissionExceptions UserPermissionException[]
+  auditLogs    AuditLog[]
+  opportunities Opportunity[]
+  orders       Order[]
+  tasks        Task[]
+  activities   Activity[]
+
+  managedStores Store[]  @relation("StoreManager")
+  ledTeams      Team[]   @relation("TeamLeader")
+
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  @@index([companyId])
+  @@index([storeId])
+  @@index([teamId])
+  @@index([roleId])
+}
+
+// ==========================================
+// CONVERSAS & MENSAGENS (WHATSAPP)
+// ==========================================
 
 model Chat {
   id              String    @id // JID do WhatsApp (ex: 5511999999999@s.whatsapp.net)
+  companyId       String?
+  company         Company?  @relation(fields: [companyId], references: [id], onDelete: SetNull)
+
   name            String?   // Nome salvo ou editado
   pushName        String?   // Nome do perfil do WhatsApp do cliente
   phone           String    // Telefone formatado
@@ -31,7 +241,7 @@ model Chat {
   notes           String    @default("")     // Notas de CRM internas
   avatarUrl       String?   // URL do avatar do contato no WhatsApp
   isArchived      Boolean   @default(false)  // Se a conversa está arquivada no WhatsApp
-  
+
   storeId         String?
   store           Store?    @relation(fields: [storeId], references: [id], onDelete: SetNull)
 
@@ -43,7 +253,12 @@ model Chat {
   createdAt       DateTime  @default(now())
   updatedAt       DateTime  @updatedAt
   messages        Message[]
+  opportunities   Opportunity[]
+  orders          Order[]
+  tasks           Task[]
+  activities      Activity[]
 
+  @@index([companyId])
   @@index([storeId])
   @@index([assignedUserId])
 }
@@ -55,7 +270,7 @@ model Message {
   fromMe      Boolean
   senderName  String?
   text        String
-  type        String   @default("text") // text, audio, image, video, document
+  type        String   @default("text") // text, audio, image, video, document, product
   mediaUrl    String?
   timestamp   DateTime
   status      String   @default("PENDING") // PENDING, SENT, DELIVERED, READ
@@ -64,24 +279,345 @@ model Message {
   @@index([timestamp])
 }
 
-model User {
-  id           String    @id @default(uuid())
-  email        String    @unique
-  passwordHash String
-  name         String
-  role         String    @default("OPERATOR") // ADMIN, MANAGER, OPERATOR
-  isActive     Boolean   @default(true)
-  
-  storeId      String?
-  store        Store?    @relation(fields: [storeId], references: [id], onDelete: SetNull)
+// ==========================================
+// CATÁLOGO DE PRODUTOS E COLEÇÕES
+// ==========================================
 
-  assignedChats Chat[]
+model ProductCategory {
+  id          String    @id @default(uuid())
+  companyId   String?
+  company     Company?  @relation(fields: [companyId], references: [id], onDelete: SetNull)
 
-  createdAt    DateTime  @default(now())
-  updatedAt    DateTime  @updatedAt
+  name        String    // Ex: Scooters, Trail, Street, Elétricas
+  description String?
+  orderIndex  Int       @default(0)
 
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  products    Product[]
+
+  @@index([companyId])
+}
+
+model ProductCollection {
+  id          String    @id @default(uuid())
+  companyId   String?
+  company     Company?  @relation(fields: [companyId], references: [id], onDelete: SetNull)
+
+  name        String    // Ex: Lançamentos, Mais Vendidos, Ofertas da Semana
+  description String?
+  slug        String?
+  orderIndex  Int       @default(0)
+
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  items       CollectionProduct[]
+
+  @@index([companyId])
+}
+
+model Product {
+  id            String    @id @default(uuid())
+  companyId     String?
+  company       Company?  @relation(fields: [companyId], references: [id], onDelete: SetNull)
+
+  storeId       String?   // Opcional se for produto exclusivo de uma loja
+  store         Store?    @relation(fields: [storeId], references: [id], onDelete: SetNull)
+
+  categoryId    String?
+  category      ProductCategory? @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+
+  name          String    // Ex: Shineray SHI 175 EFI
+  sku           String?   // Código SKU / Ref
+  description   String?
+  brand         String    @default("Shineray")
+  price         Float     // Preço regular R$
+  promoPrice    Float?    // Preço promocional R$
+  cost          Float?    // Custo R$
+  margin        Float?    // Margem calculada (%)
+  stockStatus   String    @default("AVAILABLE") // AVAILABLE, UNAVAILABLE, ON_DEMAND
+  originCountry String    @default("Brasil")
+  images        String    @default("[]") // JSON Array de URLs (suporte até 10 imagens)
+  videoUrl      String?
+  link          String?
+  visibility    String    @default("VISIBLE") // VISIBLE, HIDDEN, ARCHIVED
+
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  collections   CollectionProduct[]
+  orderItems    OrderItem[]
+
+  @@index([companyId])
+  @@index([storeId])
+  @@index([categoryId])
+}
+
+model CollectionProduct {
+  id           String            @id @default(uuid())
+  collectionId String
+  collection   ProductCollection @relation(fields: [collectionId], references: [id], onDelete: Cascade)
+  productId    String
+  product      Product           @relation(fields: [productId], references: [id], onDelete: Cascade)
+  orderIndex   Int               @default(0)
+
+  @@unique([collectionId, productId])
+  @@index([collectionId])
+  @@index([productId])
+}
+
+// ==========================================
+// CRM: FUNIS, ETAPAS, OPORTUNIDADES & PEDIDOS
+// ==========================================
+
+model Pipeline {
+  id          String          @id @default(uuid())
+  companyId   String?
+  company     Company?        @relation(fields: [companyId], references: [id], onDelete: SetNull)
+
+  name        String          // Ex: Funil Comercial Matriz, Funil Pós-Venda
+  isDefault   Boolean         @default(false)
+  createdAt   DateTime        @default(now())
+  updatedAt   DateTime        @updatedAt
+
+  stages      PipelineStage[]
+  opportunities Opportunity[]
+
+  @@index([companyId])
+}
+
+model PipelineStage {
+  id             String        @id @default(uuid())
+  pipelineId     String
+  pipeline       Pipeline      @relation(fields: [pipelineId], references: [id], onDelete: Cascade)
+
+  name           String        // Ex: Novo Lead, Qualificação, Negociação, Proposta, Ganho, Perdido
+  orderIndex     Int           @default(0)
+  color          String        @default("#3B82F6")
+  winProbability Float         @default(0.0) // 0% a 100%
+
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+
+  opportunities  Opportunity[]
+
+  @@index([pipelineId])
+}
+
+model LossReason {
+  id          String        @id @default(uuid())
+  companyId   String?
+  company     Company?      @relation(fields: [companyId], references: [id], onDelete: SetNull)
+
+  name        String        // Ex: Preço, Financiamento reprovado, Concorrente, etc.
+  createdAt   DateTime      @default(now())
+
+  opportunities Opportunity[]
+
+  @@index([companyId])
+}
+
+model Opportunity {
+  id                String         @id @default(uuid())
+  companyId         String?
+  company           Company?       @relation(fields: [companyId], references: [id], onDelete: SetNull)
+
+  storeId           String?
+  store             Store?         @relation(fields: [storeId], references: [id], onDelete: SetNull)
+
+  chatId            String
+  chat              Chat           @relation(fields: [chatId], references: [id], onDelete: Cascade)
+
+  pipelineId        String
+  pipeline          Pipeline       @relation(fields: [pipelineId], references: [id], onDelete: Restrict)
+
+  stageId           String
+  stage             PipelineStage  @relation(fields: [stageId], references: [id], onDelete: Restrict)
+
+  assignedUserId    String?
+  assignedUser      User?          @relation(fields: [assignedUserId], references: [id], onDelete: SetNull)
+
+  title             String         // Ex: Compra SHI 175 EFI 2026
+  value             Float          @default(0.0)
+  probability       Float          @default(50.0)
+  expectedCloseDate DateTime?
+  status            String         @default("OPEN") // OPEN, WON, LOST
+
+  lossReasonId      String?
+  lossReason        LossReason?    @relation(fields: [lossReasonId], references: [id], onDelete: SetNull)
+
+  notes             String?
+
+  createdAt         DateTime       @default(now())
+  updatedAt         DateTime       @updatedAt
+
+  tasks             Task[]
+
+  @@index([companyId])
+  @@index([storeId])
+  @@index([chatId])
+  @@index([pipelineId])
+  @@index([stageId])
+  @@index([assignedUserId])
+}
+
+model Order {
+  id             String      @id @default(uuid())
+  companyId      String?
+  company        Company?    @relation(fields: [companyId], references: [id], onDelete: SetNull)
+
+  storeId        String?
+  store          Store?      @relation(fields: [storeId], references: [id], onDelete: SetNull)
+
+  chatId         String
+  chat           Chat        @relation(fields: [chatId], references: [id], onDelete: Cascade)
+
+  assignedUserId String?
+  assignedUser   User?       @relation(fields: [assignedUserId], references: [id], onDelete: SetNull)
+
+  status         String      @default("NEW") // NEW, ANALYZING, CONFIRMED, PROCESSING, COMPLETED, CANCELLED
+  totalValue     Float       @default(0.0)
+  notes          String?
+
+  createdAt      DateTime    @default(now())
+  updatedAt      DateTime    @updatedAt
+
+  items          OrderItem[]
+
+  @@index([companyId])
+  @@index([storeId])
+  @@index([chatId])
+  @@index([assignedUserId])
+}
+
+model OrderItem {
+  id         String   @id @default(uuid())
+  orderId    String
+  order      Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  productId  String
+  product    Product  @relation(fields: [productId], references: [id], onDelete: Restrict)
+
+  quantity   Int      @default(1)
+  unitPrice  Float
+  subtotal   Float
+
+  @@index([orderId])
+  @@index([productId])
+}
+
+// ==========================================
+// TAREFAS & TIMELINE DE ATIVIDADES
+// ==========================================
+
+model Task {
+  id             String       @id @default(uuid())
+  companyId      String?
+  company        Company?     @relation(fields: [companyId], references: [id], onDelete: SetNull)
+
+  chatId         String
+  chat           Chat         @relation(fields: [chatId], references: [id], onDelete: Cascade)
+
+  opportunityId  String?
+  opportunity    Opportunity? @relation(fields: [opportunityId], references: [id], onDelete: SetNull)
+
+  assignedUserId String?
+  assignedUser   User?        @relation(fields: [assignedUserId], references: [id], onDelete: SetNull)
+
+  title          String       // Ex: Retornar proposta de financiamento
+  description    String?
+  dueDate        DateTime?
+  priority       String       @default("MEDIUM") // LOW, MEDIUM, HIGH, URGENT
+  status         String       @default("PENDING") // PENDING, IN_PROGRESS, COMPLETED, CANCELLED
+
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+
+  @@index([companyId])
+  @@index([chatId])
+  @@index([opportunityId])
+  @@index([assignedUserId])
+}
+
+model Activity {
+  id          String   @id @default(uuid())
+  companyId   String?
+  company     Company? @relation(fields: [companyId], references: [id], onDelete: SetNull)
+
+  chatId      String
+  chat        Chat     @relation(fields: [chatId], references: [id], onDelete: Cascade)
+
+  userId      String?
+  user        User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  type        String   // MESSAGE, NOTE, CALL, STAGE_CHANGE, ASSIGN_CHANGE, PRODUCT_SENT, ORDER_CREATED, TASK
+  description String
+  metadata    String?  // JSON complementar (ex: { productId, orderId, oldStage, newStage })
+
+  createdAt   DateTime @default(now())
+
+  @@index([companyId])
+  @@index([chatId])
+  @@index([userId])
+  @@index([createdAt])
+}
+
+// ==========================================
+// RESPOSTAS RÁPIDAS
+// ==========================================
+
+model QuickReply {
+  id          String   @id @default(uuid())
+  companyId   String?
+  company     Company? @relation(fields: [companyId], references: [id], onDelete: SetNull)
+
+  storeId     String?
+  store       Store?   @relation(fields: [storeId], references: [id], onDelete: SetNull)
+
+  shortcut    String   // Ex: /financiamento, /endereco, /catalogo
+  category    String   @default("GERAL") // Vendas, Informações, Suporte
+  title       String   // Título amigável
+  content     String   // Texto da mensagem
+  mediaUrl    String?
+
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([companyId])
   @@index([storeId])
 }
+
+// ==========================================
+// AUDITORIA DO SISTEMA
+// ==========================================
+
+model AuditLog {
+  id        String   @id @default(uuid())
+  companyId String?
+  company   Company? @relation(fields: [companyId], references: [id], onDelete: SetNull)
+
+  userId    String?
+  user      User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  action    String   // CREATE, UPDATE, DELETE, LOGIN, LOGOUT, DISCONNECT, PERMISSION_CHANGE, EXPORT
+  resource  String   // USER, ROLE, STORE, TEAM, PRODUCT, ORDER, CHAT, PERMISSION, etc.
+  recordId  String?  // ID do registro afetado
+  details   String?  // JSON com antes/depois ou detalhes
+  ipAddress String?
+
+  createdAt DateTime @default(now())
+
+  @@index([companyId])
+  @@index([userId])
+  @@index([resource])
+  @@index([createdAt])
+}
+
+// ==========================================
+// AUTOMAÇÕES & IA (PRESERVADOS)
+// ==========================================
 
 model Automation {
   id          String   @id @default(uuid())
@@ -107,4 +643,3 @@ model AiConfig {
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 }
-

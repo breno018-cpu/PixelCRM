@@ -940,3 +940,89 @@ export async function logoutWhatsApp() {
     console.error('[WhatsApp] Erro ao remover pasta:', err);
   }
 }
+
+/**
+ * Envia um card de produto do catálogo para um contato via WhatsApp.
+ */
+export async function sendProductMessage(jid, product, senderUserId = null) {
+  if (!sock || connectionStatus !== 'connected') {
+    throw new Error('WhatsApp não está conectado.');
+  }
+
+  // Prepara o texto formatado do card comercial
+  const priceFormatted = product.price ? `R$ ${Number(product.price).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}` : 'Consulte';
+  const promoFormatted = product.promoPrice ? `R$ ${Number(product.promoPrice).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}` : null;
+
+  let cardText = `*🏍️ ${product.name}*\n`;
+  if (product.sku) cardText += `🏷️ *Ref / SKU:* ${product.sku}\n`;
+  cardText += `💰 *Preço:* ${priceFormatted}\n`;
+  if (promoFormatted) cardText += `🔥 *Oferta Especial:* ${promoFormatted}\n`;
+  if (product.brand) cardText += `⚡ *Marca:* ${product.brand}\n`;
+  if (product.originCountry) cardText += `📍 *Origem:* ${product.originCountry}\n`;
+  if (product.description) cardText += `\n📝 ${product.description}\n`;
+  if (product.link) cardText += `\n🔗 *Mais detalhes:* ${product.link}`;
+
+  let imagesList = [];
+  try {
+    if (typeof product.images === 'string') {
+      imagesList = JSON.parse(product.images || '[]');
+    } else if (Array.isArray(product.images)) {
+      imagesList = product.images;
+    }
+  } catch (e) {
+    imagesList = [];
+  }
+
+  const firstImage = imagesList.length > 0 ? imagesList[0] : null;
+  let sentMsg;
+
+  if (firstImage && (firstImage.startsWith('http://') || firstImage.startsWith('https://'))) {
+    sentMsg = await sock.sendMessage(jid, {
+      image: { url: firstImage },
+      caption: cardText
+    });
+  } else {
+    sentMsg = await sock.sendMessage(jid, { text: cardText });
+  }
+
+  const timestamp = new Date();
+
+  const savedMsg = await prisma.message.create({
+    data: {
+      id: sentMsg.key.id,
+      chatId: jid,
+      fromMe: true,
+      senderName: 'Você',
+      text: cardText,
+      type: 'product',
+      mediaUrl: firstImage || null,
+      timestamp: timestamp,
+      status: 'SENT'
+    }
+  });
+
+  const updatedChat = await prisma.chat.update({
+    where: { id: jid },
+    data: {
+      lastMessageText: `[Produto] ${product.name}`,
+      lastMessageTime: timestamp
+    }
+  });
+
+  // Registra atividade na timeline do cliente
+  await prisma.activity.create({
+    data: {
+      chatId: jid,
+      userId: senderUserId || null,
+      type: 'PRODUCT_SENT',
+      description: `Produto "${product.name}" enviado no WhatsApp (${priceFormatted}).`,
+      metadata: JSON.stringify({ productId: product.id, sku: product.sku, price: product.price })
+    }
+  });
+
+  ioInstance?.emit('message:new', savedMsg);
+  ioInstance?.emit('chat:updated', updatedChat);
+
+  return savedMsg;
+}
+

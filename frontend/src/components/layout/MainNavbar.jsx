@@ -6,8 +6,9 @@ import React from 'react';
 import { 
   MessageSquare, Kanban, BarChart3, Bot, Sparkles, 
   Archive, Sun, Moon, Building2, HelpCircle, 
-  LogOut, ShieldAlert, User
+  LogOut, ShieldAlert, User, ShoppingBag, ShieldCheck
 } from 'lucide-react';
+
 import { useCRM } from '../../context/CRMContext';
 
 // Logomarca Compacta da PixelLoom / Shineray
@@ -50,6 +51,8 @@ export default function MainNavbar({
   onOpenStoreModal,
   onOpenTutorialModal,
   onOpenAiModal,
+  onOpenCorporateModal,
+  onOpenCatalogModal,
   onOpenDisconnectModal,
   onLogout
 }) {
@@ -180,12 +183,36 @@ export default function MainNavbar({
             <Archive size={20} />
           </button>
 
+          {/* Catálogo Geral de Produtos (Prompt 05) */}
+          {onOpenCatalogModal && (
+            <button
+              onClick={onOpenCatalogModal}
+              className="w-10 h-10 rounded-xl flex items-center justify-center transition-all relative hover:bg-[var(--active-bg)] hover:text-emerald-600"
+              title="Catálogo de Motos Shineray"
+              aria-label="Catálogo Geral"
+            >
+              <ShoppingBag size={20} />
+            </button>
+          )}
+
         </div>
       </div>
 
       {/* 2. BASE: UTILITÁRIOS, TEMA, GESTÃO & PERFIL */}
       <div className="flex flex-col items-center gap-1.5 w-full">
         
+        {/* Governança Corporativa & Cargos (Prompt 05) */}
+        {isAdmin && onOpenCorporateModal && (
+          <button
+            onClick={onOpenCorporateModal}
+            className="w-10 h-10 rounded-xl flex items-center justify-center hover:bg-[var(--active-bg)] hover:text-[var(--primary)] transition-colors"
+            title="Governança Corporativa, Cargos & Auditoria (Prompt 05)"
+            aria-label="Governança Corporativa"
+          >
+            <ShieldCheck size={20} className="text-emerald-500 hover:scale-110 transition-transform" />
+          </button>
+        )}
+
         {/* Alternador de Tema Escuro / Claro */}
         <button
           onClick={onToggleDarkMode}
@@ -207,6 +234,7 @@ export default function MainNavbar({
             <Building2 size={19} />
           </button>
         )}
+
 
         {/* Guia Operacional Interativo */}
         {onOpenTutorialModal && (
