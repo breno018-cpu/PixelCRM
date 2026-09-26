@@ -84,8 +84,9 @@ export default function CRMInterface({ onGoToConnect, qrToken }) {
   const [showDisconnectConfirm, setShowDisconnectConfirm] = useState(false);
 
   const [activeTab, setActiveTab] = useState('chats'); // 'chats' | 'dashboard' | 'automations'
-  const [sidebarTab, setSidebarTab] = useState('crm'); // 'crm' | 'ai_copilot'
   const [messageInput, setMessageInput] = useState('');
+  const [isSendingMessage, setIsSendingMessage] = useState(false);
+  const [sendError, setSendError] = useState('');
   const [editingName, setEditingName] = useState(false);
   const [nameInput, setNameInput] = useState('');
   const [notesInput, setNotesInput] = useState('');
@@ -258,12 +259,32 @@ export default function CRMInterface({ onGoToConnect, qrToken }) {
     setBootProgress(0);
   };
 
-  const handleSendMessage = (e) => {
+  const handleSendMessage = async (e) => {
     e.preventDefault();
-    if (!messageInput.trim()) return;
-    // Bloqueia o envio real exibindo o modal de acesso restrito (Operador Júnior)
-    setShowAccessDeniedModal(true);
+    const textToSend = messageInput.trim();
+    if (!textToSend || !activeChat || isSendingMessage) return;
+
+    if (whatsappStatus !== 'connected') {
+      alert('Não é possível enviar: o WhatsApp não está conectado no momento. Por favor, conecte o aparelho primeiro.');
+      return;
+    }
+
+    setIsSendingMessage(true);
+    setSendError('');
+
+    try {
+      await sendChatMessage(textToSend);
+      setMessageInput(''); // Limpa o campo apenas após envio bem-sucedido
+    } catch (err) {
+      console.error('[Chat] Erro ao enviar mensagem:', err);
+      const msg = err.message || 'Erro ao enviar mensagem pelo WhatsApp.';
+      setSendError(msg);
+      alert(`Falha no envio: ${msg}`);
+    } finally {
+      setIsSendingMessage(false);
+    }
   };
+
 
   const handleUpdateName = () => {
     if (!nameInput.trim() || !activeChat) return;
@@ -1180,19 +1201,29 @@ export default function CRMInterface({ onGoToConnect, qrToken }) {
 
                     <input
                       type="text"
-                      placeholder="Digite uma mensagem"
+                      placeholder={
+                        whatsappStatus !== 'connected'
+                          ? "Conecte o WhatsApp para enviar mensagens"
+                          : isSendingMessage
+                          ? "Enviando mensagem..."
+                          : "Digite uma mensagem"
+                      }
                       value={messageInput}
                       onChange={(e) => setMessageInput(e.target.value)}
-                      disabled={whatsappStatus !== 'connected'}
+                      disabled={whatsappStatus !== 'connected' || isSendingMessage}
                       className="flex-1 bg-white border border-white rounded-lg px-4 py-2.5 text-xs text-[#111b21] focus:outline-none focus:ring-1 focus:ring-[#00a884]/40 placeholder-[#667781] disabled:opacity-40"
                     />
                     
                     <button
                       type="submit"
-                      disabled={!messageInput.trim() || whatsappStatus !== 'connected'}
+                      disabled={!messageInput.trim() || whatsappStatus !== 'connected' || isSendingMessage}
                       className="w-10 h-10 rounded-full bg-[#00a884] disabled:bg-[#f0f2f5] text-white disabled:text-[#667781] flex items-center justify-center hover:bg-emerald-500 active:scale-95 transition-all shrink-0 shadow-md border border-transparent"
                     >
-                      <Send size={16} className="ml-0.5 text-white" />
+                      {isSendingMessage ? (
+                        <Loader2 size={16} className="animate-spin text-white" />
+                      ) : (
+                        <Send size={16} className="ml-0.5 text-white" />
+                      )}
                     </button>
                   </form>
                 </div>

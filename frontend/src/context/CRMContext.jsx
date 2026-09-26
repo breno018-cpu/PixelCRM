@@ -215,26 +215,23 @@ export const CRMProvider = ({ children }) => {
 
   // Envia uma nova mensagem
   const sendChatMessage = async (text) => {
-    if (!activeChat) return;
+    if (!activeChat) return null;
 
-    try {
-      const response = await authFetch(`${backendUrl}/api/chats/${activeChat.id}/messages`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({ text })
-      });
+    const response = await authFetch(`${backendUrl}/api/chats/${activeChat.id}/messages`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({ text })
+    });
 
-      if (!response.ok) {
-        throw new Error('Falha ao enviar mensagem');
-      }
-
-      // A mensagem será recebida via WebSocket e adicionada na lista automaticamente
-    } catch (error) {
-      console.error('[CRM] Erro ao enviar mensagem:', error);
-      alert('Erro ao enviar mensagem. Certifique-se de que o WhatsApp está conectado.');
+    if (!response.ok) {
+      const errData = await response.json().catch(() => ({}));
+      throw new Error(errData.error || 'Falha ao enviar mensagem pelo WhatsApp.');
     }
+
+    const savedMsg = await response.json();
+    return savedMsg;
   };
 
   // Atualiza as notas, estágio de funil e tags no banco de dados
